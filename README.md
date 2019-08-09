@@ -1,11 +1,11 @@
-# nzgo
-This project provides a pure Go language driver for IBM PDA (aka Netezza)
+# nzgo - a pure Go language driver for IBM PDA (aka Netezza)
+This project provides a native Go language database driver for IBM PDA.
 
-[![GoDoc](https://godoc.org/github.com/IBM/nzgo)](https://godoc.org/github.com/IBM/nzgo)
+[![GoDoc](https://godoc.org/github.com/IBM/nzgo?status.svg)](https://godoc.org/github.com/IBM/nzgo)
 
 ## Install
 
-	go get github.com/IBM/nzgo
+`go get github.com/IBM/nzgo`
 
 ## Docs
 
@@ -36,4 +36,3 @@ code.
 * Abhiskek Jog (abhishekjog)
 * Sandeep Powar (sandippawar1412)
 * Shabbir Mohammad (shabbir10july)
-
