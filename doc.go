@@ -1,5 +1,5 @@
 /*
-Package nzgo is a pure Go netezza driver for the database/sql package.
+Package nzgo is a pure Go language driver for the database/sql package to work with IBM PDA (aka Netezza)
 
 In most cases clients will use the database/sql package instead of
 using this package directly. For example:
