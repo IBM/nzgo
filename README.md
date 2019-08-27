@@ -1,5 +1,5 @@
-# nzgo - a pure Go language driver for IBM PDA (aka Netezza)
-This project provides a native Go language database driver for IBM PDA.
+# nzgo - a pure Go language driver for IBM Performance Server for PostgreSQL
+This project provides a native Go language database driver for IBM Performance Server for PostgreSQL.
 
 [![GoDoc](https://godoc.org/github.com/IBM/nzgo?status.svg)](https://godoc.org/github.com/IBM/nzgo)
 
