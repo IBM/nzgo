@@ -1,23 +1,26 @@
 package nzgo
+
 //Interface coverage test
 
 import (
-        "context"
-        "database/sql/driver"
+	"context"
 	"database/sql"
-	"testing"
+	"database/sql/driver"
 	"fmt"
+	"testing"
 )
 
-const(
-       conninfo  = "user=admin " +
-                "port=5480 " +
-                "password=password " +
-                "dbname=db2 " +
-                "host=vmnps-dw31.svl.ibm.com " +
-                "securityLevel=3 " +
-                //"sslmode=disable"
-                "sslmode=require" //verify-ca sslrootcert=C:/Users/sandeep_pawar/postgresql/root31.crt"
+const (
+	conninfo = "user=admin " +
+		"port=5480 " +
+		"password=password " +
+		"dbname=db2 " +
+		//"host=9.32.247.36 " +
+		//"securityLevel=1 " +
+		//"sslmode=disable"
+		"host=vmnps-dw31.svl.ibm.com " +
+		"securityLevel=3 " +
+		"sslmode=require" //verify-ca sslrootcert=C:/Users/sandeep_pawar/postgresql/root31.crt"
 )
 
 func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
@@ -25,83 +28,84 @@ func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
 }
 
 func TestNewConnector_WorksWithOpenDB(t *testing.T) {
-        name := conninfo
-        c, err := NewConnector(name)
-        if err != nil {
-                t.Fatal(err)
-        }
-        db := sql.OpenDB(c)
-        defer db.Close()
-        // database/sql might not call our Open at all unless we do something with
-        // the connection
-        txn, err := db.Begin()
-        if err != nil {
-                t.Fatal(err)
-        }
-        txn.Rollback()
+	name := conninfo
+	c, err := NewConnector(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := sql.OpenDB(c)
+	defer db.Close()
+	// database/sql might not call our Open at all unless we do something with
+	// the connection
+	txn, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn.Rollback()
 }
 
 func TestNewConnector_Connect(t *testing.T) {
 	fmt.Println("Interface Function check : Connect()")
-        name := conninfo
-        c, err := NewConnector(name)
-        if err != nil {
-                t.Fatal(err)
-        }
-        db, err := c.Connect(context.Background())//Interface Connector ->connect
-        if err != nil {
-                t.Fatal(err)
-        }
-        defer db.Close()
-        // database/sql might not call our Open at all unless we do something with
-        // the connection
-        txn, err := db.(driver.ConnBeginTx).BeginTx(context.Background(), driver.TxOptions{})
-        if err != nil {
-                t.Fatal(err)
-        }
-        txn.Rollback()
+	name := conninfo
+	c, err := NewConnector(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := c.Connect(context.Background()) //Interface Connector ->connect
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	// database/sql might not call our Open at all unless we do something with
+	// the connection
+	txn, err := db.(driver.ConnBeginTx).BeginTx(context.Background(), driver.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn.Rollback()
 }
 
 func TestNewConnector_Driver(t *testing.T) {
 	fmt.Println("Interface Function check : Driver()")
-        name := conninfo
-        c, err := NewConnector(name)
-        if err != nil {
-                t.Fatal(err)
-        }
-        db, err := c.Driver().Open(name) //Connector -> driver interface
-        if err != nil {
-                t.Fatal(err)
-        }
-        defer db.Close()
-        // database/sql might not call our Open at all unless we do something with
-        // the connection
-        txn, err := db.(driver.ConnBeginTx).BeginTx(context.Background(), driver.TxOptions{})
-        if err != nil {
-                t.Fatal(err)
-        }
-        txn.Rollback()
+	name := conninfo
+	c, err := NewConnector(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := c.Driver().Open(name) //Connector -> driver interface
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	// database/sql might not call our Open at all unless we do something with
+	// the connection
+	txn, err := db.(driver.ConnBeginTx).BeginTx(context.Background(), driver.TxOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	txn.Rollback()
 }
 
-func TestRows_Next(t *testing.T){
+func TestRows_Next(t *testing.T) {
 	fmt.Println("Interface Function check : rows->Next()")
-	db, err := openTestConnConninfo( conninfo)
+	db, err := openTestConnConninfo(conninfo)
 	if err != nil {
 		panic(err)
 	}
 	defer db.Close()
-	
+
 	var c1t float32
 
-        //db.Exec("create table tdouble(c1 float); ")
-	//db.Exec(" insert into tdouble values(323123123213213213213213213213.123123); ")
+	db.Exec(" drop table tdouble if exists;")
+	db.Exec("create table tdouble(c1 float); ")
+	db.Exec(" insert into tdouble values(323123123213213213213213213213.123123); ")
 	rows, err := db.Query("select * from tdouble ")
 	if err != nil {
 		fmt.Println("call to get_work() failed: ", err)
 
 	}
-	
-        for rows.Next() {  //Interface rows->Next
+
+	for rows.Next() { //Interface rows->Next
 		if err := rows.Scan(&c1t); err != nil {
 			fmt.Println("call to get_work() failed: ", err)
 		}
@@ -109,58 +113,60 @@ func TestRows_Next(t *testing.T){
 	}
 }
 
-func TestRows_Columns(t *testing.T){
+func TestRows_Columns(t *testing.T) {
 	fmt.Println("Interface Function check : rows->Columns()")
-        db, err := openTestConnConninfo( conninfo)
-        if err != nil {
-                panic(err)
-        }
-        defer db.Close()
+	db, err := openTestConnConninfo(conninfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
 
-        rows, err := db.Query("select * from t1")
-        if err != nil {
-                fmt.Println("call to get_work() failed: ", err)
-        }
-
-        fmt.Println(rows.Columns()) //Interface Rows->Columns
+	db.Exec(" drop table testCol if exists;")
+	db.Exec("create table testCol(c1 float4, c2 double, c3 int1, c4 int2, c5 int4, c6 int8, c7 char(5), c8 varchar(10))")
+	db.Exec("insert into testCol values (-123.345, -23456.789, -128, -32768, -234567, -45678923,'xyz', 'Go lang')")
+	rows, err := db.Query("select * from testCol ;")
+	if err != nil {
+		fmt.Println("call to get_work() failed: ", err)
+	}
+	fmt.Println(rows.Columns()) //Interface Rows->Columns
 }
 
-func TestRows_Close(t *testing.T){
+func TestRows_Close(t *testing.T) {
 	fmt.Println("Interface Function check : rows->Close(), Next()")
-        db, err := openTestConnConninfo( conninfo)
-        if err != nil {
-                panic(err)
-        }
-        defer db.Close()
+	db, err := openTestConnConninfo(conninfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
 
-        var c1t float32
+	var c1t float32
 
-        db.Exec("create table tdoubleT(c1 float); ")
-        db.Exec(" insert into tdoubleT values(12.34); ")
-        db.Exec(" insert into tdoubleT values(12.45); ")
- 
-        rows, err := db.Query("select * from tdoubleT ")
-        db.Exec(" drop table tdoubleT;") 
-        if err != nil {
-                fmt.Println("call to get_work() failed: ", err)
+	db.Exec(" drop table tdouble if exists;")
+	db.Exec("create table tdouble(c1 float); ")
+	db.Exec(" insert into tdouble values(12.34); ")
+	db.Exec(" insert into tdouble values(12.45); ")
 
-        }
-        for rows.Next() {  //Interface rows->Next
-  	      if err := rows.Scan(&c1t); err != nil {
-        	      fmt.Println("call to get_work() failed: ", err)
-              }
-              fmt.Printf("c1t is: %f \n", c1t)
-//	      rows.Close() //Interface Rows->Close  --Check more
-        }
+	rows, err := db.Query("select * from tdouble ")
+	if err != nil {
+		fmt.Println("call to get_work() failed: ", err)
+
+	}
+	for rows.Next() { //Interface rows->Next
+		if err := rows.Scan(&c1t); err != nil {
+			fmt.Println("call to get_work() failed: ", err)
+		}
+		fmt.Printf("c1t is: %f \n", c1t)
+		//	      rows.Close() //Interface Rows->Close  --Check more
+	}
 }
 
-func TestPinger_Ping(t *testing.T){
+func TestPinger_Ping(t *testing.T) {
 	fmt.Println("Interface Function check : Ping()")
-        db, err := openTestConnConninfo( conninfo)
-        if err != nil {
-                panic(err)
-        }
-        defer db.Close()
+	db, err := openTestConnConninfo(conninfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
@@ -169,30 +175,24 @@ func TestPinger_Ping(t *testing.T){
 	fmt.Println("Ping Successful")
 }
 
-func TestDriver_Open(t *testing.T){
+func TestDriver_Open(t *testing.T) {
 	fmt.Println("Interface Function check(Calls internally) : Open()")
-        db, err := openTestConnConninfo( conninfo) //calls interface internally
-        if err != nil {
-                panic(err)
-        }
-        defer db.Close()
-
-        fmt.Println("Open/Close connection success")
-}
-
-/*
-//Only first query gets executed on nps 
-func TestRowsNextResultSet_MultipleResult(t *testing.T) {
-	fmt.Println("Interface Function check : rows->HasNextResultSet(), rows->NextResultSet()")
-	db, _ := openTestConnConninfo( conninfo)
+	db, err := openTestConnConninfo(conninfo) //calls interface internally
+	if err != nil {
+		panic(err)
+	}
 	defer db.Close()
 
-	rows, err := db.Query("
-		begin;
-			select * from information_schema.tables limit 1;
-			select * from information_schema.columns limit 2;
-		commit;
-	")
+	fmt.Println("Open/Close connection success")
+}
+
+//Only first query gets executed on nps
+func TestRowsNextResultSet_MultipleResult(t *testing.T) {
+	fmt.Println("Interface Function check : rows->HasNextResultSet(), rows->NextResultSet()")
+	db, _ := openTestConnConninfo(conninfo)
+	defer db.Close()
+
+	rows, err := db.Query("		begin;			select * from information_schema.tables limit 1;			select * from information_schema.columns limit 2;		commit;")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,9 +220,8 @@ func TestRowsNextResultSet_MultipleResult(t *testing.T) {
 		}
 	}
 }
-*/
 
-func TestConn_BeginCloseRollback(t *testing.T){
+func TestConn_BeginCloseRollback(t *testing.T) {
 	fmt.Println("Interface Function check : Conn->Close(),Begin(); Tx->Rollback()")
 	conn, err := openTestConnConninfo(conninfo)
 	if err != nil {
@@ -230,41 +229,34 @@ func TestConn_BeginCloseRollback(t *testing.T){
 	}
 	defer conn.Close() //Interface conn->close
 
-	txn, err := conn.Begin()//Interface conn->Begin
+	txn, err := conn.Begin() //Interface conn->Begin
 	if err != nil {
-		t.Fatalf("%#v",err)
-		
+		t.Fatalf("%#v", err)
+
 	}
-	rows, err := txn.Query("SELECT USER")//Internally calls conn->query() and not Query()
+	rows, err := txn.Query("SELECT USER") //Internally calls conn->query() and not Query()
 	if err != nil {
 		txn.Rollback()
-		t.Fatalf("%#v",err)
+		t.Fatalf("%#v", err)
 	} else {
 		rows.Close()
-		//fmt.Printf("Ok ")		
+		//fmt.Printf("Ok ")
 	}
-	txn.Rollback()//Interface Tx->Rollback()
-        //txn.Commit()//Interface Tx->Commit() //creates problem here
-	
+	txn.Rollback() //Interface Tx->Rollback()
+	//txn.Commit()//Interface Tx->Commit() //creates problem here
+
 }
 
-/*
-//panic: unknown error: "Unknown response: 0"
-//Because of commit, .Next gets unexpected response error
-//multiple statemnt in begin commit may be causing issue
-func TestTx_Commit(t *testing.T){
-	// minified test case based on bug reports from
-	// pico303@gmail.com and rangelspam@gmail.com
-	//t.Skip("Skipping failing test")
+func TestTx_Commit(t *testing.T) {
 	fmt.Println("Interface Function check : Tx->Commit()")
-	db,_ := openTestConnConninfo(conninfo) 
+	db, _ := openTestConnConninfo(conninfo)
 	defer db.Close()
 
 	tx, err := db.Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tx.Commit()//Interface tx->Commit()
+	defer tx.Commit() //Interface tx->Commit()
 
 	rows, err := tx.Query("select 1")
 	if err != nil {
@@ -306,19 +298,19 @@ func TestTx_Commit(t *testing.T){
 		t.Fatal(err)
 	}
 }
-*/
 
-func TestResult_RowsAffected(t *testing.T){
+func TestResult_RowsAffected(t *testing.T) {
 	fmt.Println("Interface Function check : Conn->Exec(), Result->RowsAffected(), Result->LastInsertId()")
-	db,_ := openTestConnConninfo(conninfo)
+	db, _ := openTestConnConninfo(conninfo)
 	defer db.Close()
 
-	_, err := db.Exec("CREATE TEMP TABLE temp (a int)") //Interface Execer->Exec()
+	db.Exec(" drop table tTemp if exists;")
+	_, err := db.Exec("CREATE TEMP TABLE tTemp (a int)") //Interface Execer->Exec()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r, err := db.Exec("INSERT INTO temp VALUES (1)")
+	r, err := db.Exec("INSERT INTO tTemp VALUES (1)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,64 +318,52 @@ func TestResult_RowsAffected(t *testing.T){
 	if n, _ := r.RowsAffected(); n != 1 {
 		t.Fatalf("expected 1 row affected, not %d", n)
 	}
-	val,_ := r.RowsAffected() //Interface Result->RowsAffected()
-	id,_ := r.LastInsertId() //Interface Result->LastInsertId()
+	val, _ := r.RowsAffected() //Interface Result->RowsAffected()
+	id, _ := r.LastInsertId()  //Interface Result->LastInsertId()
 	fmt.Println("Rows Affected : ", val)
 	fmt.Println("Last Inserted Id : ", id)
-	r, err = db.Exec("INSERT INTO temp VALUES (3)")
-        val,_ = r.RowsAffected() //Interface Result->RowsAffected()
-        id,_ = r.LastInsertId() //Interface Result->LastInsertId()
-        fmt.Println("Rows Affected : ", val)
-        fmt.Println("Last Inserted Id : ", id)
+	r, err = db.Exec("INSERT INTO tTemp VALUES (3)")
+	val, _ = r.RowsAffected() //Interface Result->RowsAffected()
+	id, _ = r.LastInsertId()  //Interface Result->LastInsertId()
+	fmt.Println("Rows Affected : ", val)
+	fmt.Println("Last Inserted Id : ", id)
 
-/*
-//--- FAIL: TestResult_RowsAffected (0.75s)
-//panic: Unknown response for simple exec: 'P' [recovered]
-//        panic: unknown error: "Unknown response for simple exec: 'P'" [recovered]
-//        panic: unknown error: "Unknown response for simple exec: 'P'"
+	db.Exec("INSERT INTO tTemp VALUES (1)")
+	r, err = db.Exec("delete from tTemp where a=1;")
+	val, _ = r.RowsAffected() //Interface Result->RowsAffected()
+	fmt.Println("Rows Affected : ", val)
 
-        r, err = db.Exec("select a from temp a")
-        val,_ = r.RowsAffected() //Interface Result->RowsAffected()
-        fmt.Println("Rows Affected : ", val)
-*/
-        
 }
 
-func TestExecerContext_ExecContext(t *testing.T){
+func TestExecerContext_ExecContext(t *testing.T) {
 	fmt.Println("Interface Function check : Conn->ExecContext()")
-        db,_ := openTestConnConninfo(conninfo)
-        defer db.Close()
+	db, _ := openTestConnConninfo(conninfo)
+	defer db.Close()
 
-	_, cancel := context.WithCancel(context.Background())
-	//ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-/*
-//--- FAIL: TestExecerContext_ExecContext (0.15s)
-//panic: Unknown response for simple exec: 'P' [recovered]
-//        panic: unknown error: "Unknown response for simple exec: 'P'" [recovered]
-//        panic: unknown error: "Unknown response for simple exec: 'P'"
-	if _, err := db.ExecContext(ctx, "select 1"); err != nil {  //Interface ExecerContext->ExecContext()
+
+	if _, err := db.ExecContext(ctx, "drop table tdouble if exists;"); err != nil { //Interface ExecerContext->ExecContext()
 		t.Fatal(err)
 	}
-*/
+
 }
 
-func TestQueryerContext_QueryContext(t *testing.T){
-        fmt.Println("Interface Function check : Conn->QueryContext()")
-	db,_ := openTestConnConninfo(conninfo)
-        defer db.Close()
+func TestQueryerContext_QueryContext(t *testing.T) {
+	fmt.Println("Interface Function check : Conn->QueryContext()")
+	db, _ := openTestConnConninfo(conninfo)
+	defer db.Close()
 
-        ctx, cancel := context.WithCancel(context.Background())
-        defer cancel()
-        if _, err := db.QueryContext(ctx, "select 1"); err != nil {  //Interface ExecerContext->QueryContext()
-                t.Fatal(err)
-        }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if _, err := db.QueryContext(ctx, "select 1"); err != nil { //Interface ExecerContext->QueryContext()
+		t.Fatal(err)
+	}
 }
 
-
-func TestConn_Prepare(t *testing.T){
+func TestConn_Prepare(t *testing.T) {
 	fmt.Println("Interface Function check : Conn->Prepare()")
-        db,_ := openTestConnConninfo(conninfo)
+	db, _ := openTestConnConninfo(conninfo)
 	defer db.Close()
 
 	st, err := db.Prepare("SELECT 1") //Interface conn->Prepare()
@@ -441,10 +421,10 @@ func TestConn_Prepare(t *testing.T){
 	}
 }
 
-func TestRows_ColumnInfo(t *testing.T){
+func TestRows_ColumnInfo(t *testing.T) {
 	fmt.Println("Interface Function check(Calls internally) : ColumnTypeLength(), ColumnTypePrecisionScale(), ColumnTypeScanType(), ColumnTypeDatabaseTypeName()")
-        db,_ := openTestConnConninfo(conninfo)
-        defer db.Close()
+	db, _ := openTestConnConninfo(conninfo)
+	defer db.Close()
 
 	rows, err := db.Query("select * from information_schema.tables limit 1;                    ")
 	if err != nil {
@@ -455,10 +435,10 @@ func TestRows_ColumnInfo(t *testing.T){
 	//Interface ColumnTypeLength(), ColumnTypePrecisionScale(), ColumnTypeScanType(), ColumnTypeDatabaseTypeName()
 }
 
-func TestStmt_QueryExecCloseNumInput(t *testing.T){
-	fmt.Println("Interface Function check : stmt->Query(), stmt->Exec() ; Calls internally : stmt->NumInput(), stmt->close(), conn->Close()") 
-        db,_ := openTestConnConninfo(conninfo)
-        defer db.Close()
+func TestStmt_QueryExecCloseNumInput(t *testing.T) {
+	fmt.Println("Interface Function check : stmt->Query(), stmt->Exec() ; Calls internally : stmt->NumInput(), stmt->close(), conn->Close()")
+	db, _ := openTestConnConninfo(conninfo)
+	defer db.Close()
 
 	st, err := db.Prepare("SELECT 1") //Interfcae stmt->NumInput() internally called
 	if err != nil {
@@ -484,14 +464,8 @@ func TestStmt_QueryExecCloseNumInput(t *testing.T){
 	if i != 1 {
 		t.Fatalf("expected 1, got %d", i)
 	}
-/*
---- FAIL: TestStmt_QueryExecCloseNumInput (0.28s)
-panic: Unknown response for simple exec: 'P' [recovered]
-        panic: unknown error: "Unknown response for simple exec: 'P'" [recovered]
-        panic: unknown error: "Unknown response for simple exec: 'P'"
 
-	st2, _ := db.Prepare("SELECT 1")
+	st2, _ := db.Prepare("drop table tdouble if exists;")
 	st2.Exec() //Interface stmt->Exec()
-*/
 
 }
