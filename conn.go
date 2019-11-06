@@ -2576,7 +2576,7 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		fieldDataP := CTable_FieldAt(res.dbosTupleDescriptor, r, cur_field)
 
 		// a bitmap with value of 1 denotes null column
-		if bitmap[res.dbosTupleDescriptor.field_physField[field_lf]] == 1 && res.dbosTupleDescriptor.nullsAllowed != 0 {
+		if bitmap[res.dbosTupleDescriptor.field_physField[field_lf]] == 1 && res.dbosTupleDescriptor.nullsAllowed !=0 {
 			dest[field_lf] = nil
 			elog.Debugf(chopPath(funName()), "field=%d, value= NULL", cur_field+1)
 			cur_field++
