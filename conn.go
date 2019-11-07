@@ -1168,14 +1168,14 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 		case 'N':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
-            res = &rows{cn: cn}
-            res.noticetag = responseBuf.string()
-            elog.Debugf(chopPath(funName()), "notice received from backend: %s \n", res.noticetag)
-            column := make([]string, 1)
-            column[0] = "NOTICE"
-            res.rowsHeader = rowsHeader{
-                colNames: column,
-            }
+			res = &rows{cn: cn}
+			res.noticetag = responseBuf.string()
+			elog.Debugf(chopPath(funName()), "notice received from backend: %s \n", res.noticetag)
+			column := make([]string, 1)
+			column[0] = "NOTICE"
+			res.rowsHeader = rowsHeader{
+				colNames: column,
+			}
 		case 'P': /* get the Portal name */
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
@@ -2014,11 +2014,11 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 	}
 	defer cn.errRecover(&err)
 
-    if res.noticetag != "" {
-        dest[0] = res.noticetag
-        res.done = true
-        return
-    }
+	if res.noticetag != "" {
+		dest[0] = res.noticetag
+		res.done = true
+		return
+	}
 
 	response, err := cn.recvSingleByte()
 	if err != nil {
@@ -3454,11 +3454,11 @@ type rows struct {
 	cn     *conn
 	finish func()
 	rowsHeader
-	done   bool
-	rb     readBuf
-	result driver.Result
-	tag    string
-    noticetag string
+	done      bool
+	rb        readBuf
+	result    driver.Result
+	tag       string
+	noticetag string
 
 	next                *rowsHeader
 	dbosTuple           bool
