@@ -897,7 +897,9 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 		case 'E':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, err := cn.recv_n_bytes(int(length.int32()))
-			elog.Fatalln(funName(), responseBuf.string())
+			errorString := responseBuf.string()
+			err = errors.New(errorString)
+			elog.Infoln(funName(), errorString)
 			return res, commandTag, err
 		case 'I':
 			res = emptyRows
@@ -1198,7 +1200,9 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 		case 'E':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, err := cn.recv_n_bytes(int(length.int32()))
-			elog.Fatalln(funName(), responseBuf.string())
+			errorString := responseBuf.string()
+			err = errors.New(errorString)
+			elog.Infoln(funName(), errorString)
 			return res, err
 		case 'l':
 			cn.xferTable()
