@@ -265,7 +265,7 @@ func (d *Driver) Open(name string) (driver.Conn, error) {
 
 func init() {
 	fname := os.Getenv("GOPATH")
-	fname = fname + "\\src\\github.com\\IBM\\nzgo\\config\\conf.json"
+	fname = fname + filepath.FromSlash("/src/github.com/IBM/nzgo/config/conf.json")
 	file, _ := os.Open(fname)
 	defer file.Close()
 
