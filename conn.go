@@ -9,7 +9,6 @@ import (
 	"database/sql/driver"
 	b64 "encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -264,20 +263,6 @@ func (d *Driver) Open(name string) (driver.Conn, error) {
 }
 
 func init() {
-	fname := os.Getenv("GOPATH")
-	fname = fname + filepath.FromSlash("/src/github.com/IBM/nzgo/config/conf.json")
-	file, _ := os.Open(fname)
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	configuration = Configuration{}
-	err := decoder.Decode(&configuration)
-	elog.initialize()
-	if err != nil {
-		elog.Debugln(chopPath(funName()), "Configuration read failed ", err)
-	}
-
-	elog.Debugln(chopPath(funName()), configuration.LogLevel)
 	sql.Register("nzgo", &Driver{})
 }
 
