@@ -19,7 +19,8 @@ var (
 
 /*Valid log levels : DEBUG, INFO, FATAL, OFF*/
 type PDALogger struct {
-	logLevel string
+	LogLevel string
+	LogPath  string
 }
 
 var elog PDALogger
@@ -44,20 +45,28 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog PDALogger) initialize() {
-	/* Set loglevel here, invalid loglevel will discard all log messages */
-	elog.logLevel = "DEBUG" //This is default log level
+func (elog PDALogger) Initialize() {
 
+	var fname string
 	/* Overwrite log level mentioned in conf, if its blank use default case */
-	if configuration.LogLevel != "" {
-		elog.logLevel = strings.ToUpper(configuration.LogLevel)
+	if elog.LogLevel != "" {
+		elog.LogLevel = strings.ToUpper(elog.LogLevel)
+	} else {
+		/* Set loglevel here, invalid loglevel will discard all log messages */
+		elog.LogLevel = "DEBUG" //This is default log level
 	}
 
-	if elog.logLevel == "OFF" {
+	/* If Loglevel is OFF or anything other than DEBUG INFO OR FATAL then no log file would be created */
+	if elog.LogLevel == "OFF" && elog.LogLevel != "DEBUG" && elog.LogLevel != "INFO" && elog.LogLevel != "FATAL" {
 		Init() //It will initialize and discard all stream output. Log file won't be created
 		return
 	}
-	fname := fmt.Sprintf("nzgolang_nz%d.log", os.Getpid())
+
+	if elog.LogPath != "" {
+		fname = elog.LogPath + fmt.Sprintf("nzgolang_nz%d.log", os.Getpid())
+	} else {
+		fname = fmt.Sprintf("nzgolang_nz%d.log", os.Getpid())
+	}
 
 	/* Open file with permissions USER:read and write; GROUP&OTHERS:read */
 	fh, err := os.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -67,7 +76,7 @@ func (elog PDALogger) initialize() {
 	logBanner(fh)
 
 	Init()
-	switch elog.logLevel {
+	switch elog.LogLevel {
 	// Sequence of log level case matters. Should not be changed
 	case "DEBUG":
 		Debug.SetOutput(fh)

@@ -27,12 +27,12 @@ SecurityLevel
 
 The level of security (SSL/TLS) that the driver uses for the connection to the data store.
 
-onlyUnSecured: The driver does not use SSL. 
+onlyUnSecured: The driver does not use SSL.
 preferredUnSecured: If the server provides a choice, the driver does not use SSL.
 preferredSecured: If the server provides a choice, the driver uses SSL.
 onlySecured: The driver does not connect unless an SSL connection is available.
 
-Similarly, Netezza server has above securityLevel. 
+Similarly, Netezza server has above securityLevel.
 
 Cases which would fail:
 Client tries to connect with 'Only secured' or 'Preferred secured' mode while server is 'Only Unsecured' mode.
@@ -46,19 +46,19 @@ Below are the securityLevel you can pass in connection string :
 	 1: Only Unsecured session
 	 2: Preferred Secured session
 	 3: Only Secured session
-	 
 
-Connection String 
 
-Use Open to create a database handle with connection parameters: 
+Connection String
+
+Use Open to create a database handle with connection parameters:
 	db, err := sql.Open("nzgo", "<connection string>")
 
-The Go Netezza Driver supports the following connection syntaxes (or data source name formats): 
+The Go Netezza Driver supports the following connection syntaxes (or data source name formats):
 
  "host=vmnps-dw10.svl.ibm.com user=admin dbname=db1 port=5480 password=password sslmode=require sslrootcert=C:/Users/root31.crt securityLevel=3"
 
-The above example opens a database handle on NPS server 'vmnps-dw10.svl.ibm.com'. 
-Golang driver should connect on port 5480(postgres port). The user is admin, 
+The above example opens a database handle on NPS server 'vmnps-dw10.svl.ibm.com'.
+Golang driver should connect on port 5480(postgres port). The user is admin,
 password is password, database is db1, sslmode is require, and the location of the root
 certificate file is C:/Users/root31.crt with securityLevel as 'Only Secured session'
 
@@ -108,7 +108,7 @@ Queries
 
 database/sql does not dictate any specific format for parameter markers
 in query strings, but nzgo uses the Netezza-specific parameter markers i.e. '?',
-as shown below. 
+as shown below.
 
 	rows, err := db.Query(`SELECT name FROM users WHERE favorite_fruit = ?
 		OR age = ? `, "orange", 64)
@@ -125,11 +125,11 @@ nzgo supports the RowsAffected() method of the Result type in database/sql.
 	if err == nil {
 		row, _ := result.RowsAffected()
 	}
-	
-For additional instructions on querying see the documentation for the database/sql package.
-nzgo also supports transaction queries as specified in database/sql package https://github.com/golang/go/wiki/SQLInterface.   
 
-Transactions are started by calling Begin. 
+For additional instructions on querying see the documentation for the database/sql package.
+nzgo also supports transaction queries as specified in database/sql package https://github.com/golang/go/wiki/SQLInterface.
+
+Transactions are started by calling Begin.
 
 	tx, err := conn.Begin()
 	if err != nil {
@@ -161,14 +161,14 @@ This package returns the following types for values from the Netezza backend:
 	  returned as string
 	- numeric and geometry are returned as string
 	- the boolean type is returned as bool
-	
-	
+
+
 External table
 
 You can unload data from an IBM Netezza database table on a Netezza host system to a remote client.
 This unload does not remove rows from the database but instead stores the unloaded data in a flat file
 (external table) that is suitable for loading back into a Netezza database.
-Below query would create a file 'et1.txt' on remote system from Netezza table t2 with data delimeted by '|'. 
+Below query would create a file 'et1.txt' on remote system from Netezza table t2 with data delimeted by '|'.
 
 	result, err := db.Exec("create external table et1 'C:\\et1.txt' using (remotesource 'golang' delim '|') as select * from t2;")
 	if err != nil {
@@ -182,18 +182,24 @@ See https://www.ibm.com/support/knowledgecenter/en/SSULQD_7.2.1/com.ibm.nz.load.
 for more information about external table
 
 
-Logging 
+Logging
 
-nzgo defines a simple logger interface. Set LogLevel to control logging verbosity. 
-In order to enable debug logging for the driver, change the LogLevel in conf.json file,
-for example in file config/conf.json : 
+nzgo defines a simple logger interface. Set LogLevel to control logging verbosity and LogPath to specify log file path.
+In order to enable logging for the driver, you need to write below code in your application
 
-{
-    "LogLevel": "Info"
-}
+    var elog nzgo.PDALogger
+    elog.LogLevel = "off"
+    elog.LogPath = "C:\\Logs\\"
+    elog.Initialize()
+
+Declaring elog variable and calling elog.Initialize() function is mandatory else application would fail with error "runtime error: invalid memory address or nil pointer dereference".
+
+You can configure LogLevel and LogPath (i.e. log file directory) as per your requirement.
+
+You may skip initializing LogLevel and LogPath values. In such case, it would take default values. Default value for LogLevel is DEBUG
+while for LogPath is same directory as your application.
 
 Other valid values for 'LogLevel' are : "OFF" , "DEBUG", "INFO" and "FATAL"
 
 */
 package nzgo
-
