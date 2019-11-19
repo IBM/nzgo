@@ -2717,8 +2717,8 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeDouble: //double precision 64bits
 			byteBuf := fieldDataP.next(fldlen)
 			bits := (*(*uint64)(unsafe.Pointer(&byteBuf[0])))
-			dest[field_lf] = math.Float64frombits(bits)
-			elog.Debugf(chopPath(funName()), "field=%d, datatype=NzTypeDouble, value=%f, len=%d ", cur_field+1, dest[field_lf], fldlen)
+			dest[field_lf] = fmt.Sprintf("%.15g", math.Float64frombits(bits))
+			elog.Debugf(chopPath(funName()), "field=%d, datatype=NzTypeDouble, value=%s, len=%d ", cur_field+1, dest[field_lf], fldlen)
 
 		case NzTypeFloat: //double precision 32bits
 			byteBuf := fieldDataP.next(fldlen)
