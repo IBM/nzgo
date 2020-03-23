@@ -24,10 +24,14 @@ const (
 )
 
 func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	return sql.Open("nzgo", conninfostr)
 }
 
 func TestNewConnector_WorksWithOpenDB(t *testing.T) {
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -46,6 +50,8 @@ func TestNewConnector_WorksWithOpenDB(t *testing.T) {
 
 func TestNewConnector_Connect(t *testing.T) {
 	fmt.Println("Interface Function check : Connect()")
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -67,6 +73,8 @@ func TestNewConnector_Connect(t *testing.T) {
 
 func TestNewConnector_Driver(t *testing.T) {
 	fmt.Println("Interface Function check : Driver()")
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
