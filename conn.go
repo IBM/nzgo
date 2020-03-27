@@ -369,6 +369,10 @@ type conn struct {
 	protocol2     int
 	commandNumber int
 	status        int
+	guardium_clientHostName string
+	guardium_clientOSUser   string
+	guardium_applName       string
+	guardium_clientOS       string
 }
 
 // Handle driver-side settings in parsed connection string.
@@ -1768,6 +1772,13 @@ func (cn *conn) startup(o values) (err error) {
 	}
 	elog.Infoln("Handshake negotiation successful")
 
+	// guardium related information
+	username, _ := user.Current()
+	cn.guardium_clientOS = runtime.GOOS
+	cn.guardium_clientOSUser = username.Username
+	cn.guardium_clientHostName, err = os.Hostname()
+	cn.guardium_applName = filepath.Base(os.Args[0])
+
 	//Send handshake information to server
 	elog.Infoln("Send handshake information to server")
 	success := cn.Conn_send_database(o)
@@ -1785,7 +1796,17 @@ func (cn *conn) startup(o values) (err error) {
 		return err
 	}
 
-	success = cn.Conn_send_handshake_version2(o)
+	switch cn.hsVersion {
+	case CP_VERSION_4:
+		success = cn.Conn_send_handshake_version4(o)
+		break
+	case CP_VERSION_3:
+		success = cn.Conn_send_handshake_version2(o)
+		break
+	case CP_VERSION_2:
+		success = cn.Conn_send_handshake_version2(o)
+		break
+	}
 	if success != true {
 		return err
 	}
@@ -3148,6 +3169,144 @@ func (cn *conn) Conn_send_handshake_version2(o values) bool {
 			b.int16(message.opcode)
 			b.string(message.payload)
 			elog.Debugln(chopPath(funName()), "Username ", message.payload)
+			information = HSV2_PROTOCOL
+			break
+
+		case HSV2_PROTOCOL: /* Postgre data protocol */
+			message = HSV2Msg{
+				opcode: information,
+			}
+
+			b.int16(message.opcode)
+			b.int16(cn.protocol1)
+			b.int16(cn.protocol2)
+			elog.Debugln(chopPath(funName()), "Postgres data protocol ", cn.protocol1, cn.protocol2)
+			information = HSV2_REMOTE_PID
+			break
+
+		case HSV2_REMOTE_PID: /* Remote PID */
+			message = HSV2Msg{
+				opcode:  information,
+				payload: strconv.Itoa(os.Getpid()),
+			}
+			b.int16(message.opcode)
+			typ, _ := strconv.Atoi(message.payload)
+			b.int32(typ)
+			elog.Debugln(chopPath(funName()), "Remote PID ", message.payload)
+			information = HSV2_CLIENT_TYPE
+			break
+
+		case HSV2_CLIENT_TYPE: /* Golang client */
+
+			message = HSV2Msg{
+				opcode:  information,
+				payload: strconv.Itoa(NPSCLIENT_TYPE_GOLANG), //No Use check below
+			}
+
+			b.int16(message.opcode)
+			typ, _ := strconv.Atoi(message.payload)
+			b.int16(typ)
+			elog.Debugln(chopPath(funName()), "Golang client ", message.payload)
+			information = HSV2_CLIENT_DONE
+			break
+
+		case HSV2_CLIENT_DONE: /* Finished sending the information */
+			message = HSV2Msg{
+				opcode: information,
+			}
+
+			b = cn.writeBuf(0)
+			b.int16(message.opcode)
+			b.string(message.payload)
+			elog.Debugln(chopPath(funName()), "Finishing sending information")
+			information = 0
+			break
+		}
+
+		cn.send(b)
+		if information != 0 {
+			beresp, _ := cn.recvSingleByte()
+			elog.Debugf(chopPath(funName()), "Backend response %c \n", beresp)
+			switch beresp {
+			case 'N':
+				break
+			case 'E':
+				elog.Fatalln(chopPath(funName()), "ERROR_CONN_FAIL")
+				return false
+			default:
+				elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (cn *conn) Conn_send_handshake_version4(o values) bool {
+
+	message := HSV2Msg{
+		opcode:  0,
+		payload: "",
+	}
+	information := HSV2_USER
+	b := cn.writeBuf(0)
+
+	for information != 0 {
+		b = cn.writeBuf(0)
+		switch information {
+		case HSV2_USER: /* Username */
+			message = HSV2Msg{
+				opcode:  information,
+				payload: o["user"],
+			}
+
+			b.int16(message.opcode)
+			b.string(message.payload)
+			elog.Debugln(chopPath(funName()), "Username ", message.payload)
+			information = HSV2_APPNAME
+			break
+
+		case HSV2_APPNAME: /* App name */
+			message = HSV2Msg{
+				opcode:  information,
+				payload: cn.guardium_applName,
+			}
+			b.int16(message.opcode)
+			b.string(message.payload)
+			elog.Debugln(chopPath(funName()), "Appname ", message.payload)
+			information = HSV2_CLIENT_OS
+			break
+
+		case HSV2_CLIENT_OS: /* OS name */
+			message = HSV2Msg{
+				opcode:  information,
+				payload: cn.guardium_clientOS,
+			}
+			b.int16(message.opcode)
+			b.string(message.payload)
+			elog.Debugln(chopPath(funName()), "OS name ", message.payload)
+			information = HSV2_CLIENT_HOST_NAME
+			break
+
+		case HSV2_CLIENT_HOST_NAME: /* Client Host name */
+			message = HSV2Msg{
+				opcode:  information,
+				payload: cn.guardium_clientHostName,
+			}
+			b.int16(message.opcode)
+			b.string(message.payload)
+			elog.Debugln(chopPath(funName()), "Client hostname ", message.payload)
+			information = HSV2_CLIENT_OS_USER
+			break
+
+		case HSV2_CLIENT_OS_USER: /* client OS User name */
+			message = HSV2Msg{
+				opcode:  information,
+				payload: cn.guardium_clientOSUser,
+			}
+			b.int16(message.opcode)
+			b.string(message.payload)
+			elog.Debugln(chopPath(funName()), "ClientOS user ", message.payload)
 			information = HSV2_PROTOCOL
 			break
 
