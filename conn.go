@@ -183,6 +183,14 @@ const (
 	CP_VERSION_2
 	CP_VERSION_3
 	CP_VERSION_4
+	CP_VERSION_5
+	CP_VERSION_6
+)
+
+/* Client type */
+const (
+	NPS_CLIENT = 0 + iota
+	IPS_CLIENT
 )
 
 type HSV2Msg struct {
@@ -226,6 +234,7 @@ const (
 	HSV2_CLIENT_OS
 	HSV2_CLIENT_HOST_NAME
 	HSV2_CLIENT_OS_USER
+	HSV2_64BIT_VARLENA_ENABLED
 )
 const (
 	HSV2_CLIENT_DONE = 1000 + iota
@@ -1716,7 +1725,7 @@ func (cn *conn) startup(o values) (err error) {
 	elog.Infoln("Starting handshake negotiation with server")
 	versionPacket := HsVersion{
 		opcode:  HSV2_CLIENT_BEGIN,
-		version: CP_VERSION_4,
+		version: CP_VERSION_6,
 	}
 	b := cn.writeBuf(0)
 	b.int16(versionPacket.opcode)
@@ -1751,6 +1760,10 @@ func (cn *conn) startup(o values) (err error) {
 				 * The later backend return the version as an unsigned short int
 				 */
 				versionPacket.version = CP_VERSION_3
+			} else if version == '4' {
+				versionPacket.version = CP_VERSION_4
+			} else if version == '5' {
+				versionPacket.version = CP_VERSION_5
 			}
 			b = cn.writeBuf(0)
 			b.int16(versionPacket.opcode)
@@ -1797,9 +1810,13 @@ func (cn *conn) startup(o values) (err error) {
 	}
 
 	switch cn.hsVersion {
+	case CP_VERSION_6:
+		fallthrough
 	case CP_VERSION_4:
 		success = cn.Conn_send_handshake_version4(o)
 		break
+	case CP_VERSION_5:
+		fallthrough
 	case CP_VERSION_3:
 		success = cn.Conn_send_handshake_version2(o)
 		break
@@ -3207,6 +3224,22 @@ func (cn *conn) Conn_send_handshake_version2(o values) bool {
 			typ, _ := strconv.Atoi(message.payload)
 			b.int16(typ)
 			elog.Debugln(chopPath(funName()), "Golang client ", message.payload)
+			if cn.hsVersion == CP_VERSION_5 {
+				information = HSV2_64BIT_VARLENA_ENABLED
+			} else {
+				information = HSV2_CLIENT_DONE
+			}
+			break
+
+		case HSV2_64BIT_VARLENA_ENABLED:
+			message = HSV2Msg{
+				opcode:  information,
+				payload: strconv.Itoa(IPS_CLIENT),
+			}
+			b.int16(message.opcode)
+			typ, _ := strconv.Atoi(message.payload)
+			b.int16(typ)
+			elog.Debugln(chopPath(funName()), "IPS client ", message.payload)
 			information = HSV2_CLIENT_DONE
 			break
 
@@ -3345,6 +3378,22 @@ func (cn *conn) Conn_send_handshake_version4(o values) bool {
 			typ, _ := strconv.Atoi(message.payload)
 			b.int16(typ)
 			elog.Debugln(chopPath(funName()), "Golang client ", message.payload)
+			if cn.hsVersion == CP_VERSION_6 {
+				information = HSV2_64BIT_VARLENA_ENABLED
+			} else {
+				information = HSV2_CLIENT_DONE
+			}
+			break
+
+		case HSV2_64BIT_VARLENA_ENABLED:
+			message = HSV2Msg{
+				opcode:  information,
+				payload: strconv.Itoa(IPS_CLIENT),
+			}
+			b.int16(message.opcode)
+			typ, _ := strconv.Atoi(message.payload)
+			b.int16(typ)
+			elog.Debugln(chopPath(funName()), "IPS client ", message.payload)
 			information = HSV2_CLIENT_DONE
 			break
 
