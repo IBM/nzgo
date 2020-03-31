@@ -477,3 +477,173 @@ func TestStmt_QueryExecCloseNumInput(t *testing.T) {
 	st2.Exec() //Interface stmt->Exec()
 
 }
+
+const (
+	JSON  int = 0
+	JSONB int = 1
+	INT   int = 2
+)
+
+type jsonbRow struct {
+	id   sql.NullInt32
+	json sql.NullString
+}
+
+type column struct {
+	typ  int
+	name string
+}
+type table struct {
+	name string
+	cols []column
+}
+
+func checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func insert(db *sql.DB, table table, val1 int, val2 string) {
+	sqlStatement := fmt.Sprintf(`INSERT INTO %v(%v, %v) VALUES (%v, %v)`,
+		table.name,
+		table.cols[0].name,
+		table.cols[1].name,
+		val1,
+		val2)
+	fmt.Println(sqlStatement)
+	res, err := db.Exec(sqlStatement)
+	checkErr(err)
+	rowsAffected, err := res.RowsAffected()
+	checkErr(err)
+	fmt.Printf("INSERT %v\n", rowsAffected)
+}
+
+func drop(db *sql.DB, table table) {
+	sqlStatement := fmt.Sprintf(`DROP TABLE %v IF EXISTS`, table.name)
+	fmt.Println(sqlStatement)
+	_, err := db.Exec(sqlStatement)
+	if err != nil {
+		fmt.Println("ERROR: ", err)
+	} else {
+		fmt.Println("DROP TABLE")
+	}
+}
+
+func selectAll(db *sql.DB, table table) {
+	sqlStatement := fmt.Sprintf(`SELECT * FROM %v`, table.name)
+	fmt.Println(sqlStatement)
+	rows, err := db.Query(sqlStatement)
+	checkErr(err)
+	defer rows.Close()
+	printTable(rows)
+}
+
+func selectWithJsonOper(db *sql.DB, table table, oper string) {
+	sqlStatement := fmt.Sprintf(`SELECT %v, %v %v FROM %v`,
+		table.cols[0].name,
+		table.cols[1].name,
+		oper,
+		table.name,
+	)
+	fmt.Println(sqlStatement)
+	rows, err := db.Query(sqlStatement)
+	checkErr(err)
+	defer rows.Close()
+	printTable(rows)
+}
+
+func printTable(rows *sql.Rows) {
+	columns, err := rows.Columns()
+	fmt.Printf("%3v | %v\n", columns[0], columns[1])
+	fmt.Printf("----+----------------------------------\n")
+	for rows.Next() {
+		checkErr(rows.Err())
+		row := jsonbRow{}
+		err = rows.Scan(
+			&row.id,
+			&row.json,
+		)
+		checkErr(err)
+
+		fmt.Printf("%3v | %v\n", row.id.Int32, row.json.String)
+	}
+}
+
+func type2Str(typ int) string {
+	switch typ {
+	case JSON:
+		return "JSON"
+	case JSONB:
+		return "JSONB"
+	case INT:
+		return "INT"
+	default:
+		panic("type2Str: Unknown datatype")
+	}
+}
+
+func create(db *sql.DB, table table) {
+	sqlStatement := fmt.Sprintf(`CREATE TEMP TABLE %v(%v %v, %v %v)`,
+		table.name,
+		table.cols[0].name,
+		type2Str(table.cols[0].typ),
+		table.cols[1].name,
+		type2Str(table.cols[1].typ))
+	fmt.Println(sqlStatement)
+	_, err := db.Exec(sqlStatement)
+	checkErr(err)
+	fmt.Println("CREATE TABLE")
+}
+
+func _TestJson(table table) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(err)
+	defer db.Close()
+	drop(db, table)
+	create(db, table)
+	insert(db, table, 1, `'{"言語":"日本語"}'`)
+	insert(db, table, 2, `'{"言語":"中文"}'`)
+	insert(db, table, 3, `'{"言語":"русский"}'`)
+	insert(db, table, 4, `'{"言語":"アラビア語"}'`)
+	insert(db, table, 5, `'{"言語":"Tiếng Việt"}'`)
+	selectAll(db, table)
+	selectWithJsonOper(db, table, `->  '言語'`)
+	selectWithJsonOper(db, table, `->> '言語'`)
+	selectWithJsonOper(db, table, `->  'Non-existent key'`)
+	selectWithJsonOper(db, table, `->> 'Non-existent key'`)
+	if table.cols[1].typ == JSONB {
+		selectWithJsonOper(db, table, `||  '{"cómo estás":"お元気ですか"}'`)
+		selectWithJsonOper(db, table, `-   '言語'::NVARCHAR(100)`)
+		selectWithJsonOper(db, table, `-   '"言語"'`)
+		selectWithJsonOper(db, table, `-   '["言語", "Non-existent key"]'`)
+		selectWithJsonOper(db, table, `?   '言語'`)
+		selectWithJsonOper(db, table, `?   'Non-existent key'`)
+		selectWithJsonOper(db, table, `?|  '["言語", "Non-existent key"]'`)
+		selectWithJsonOper(db, table, `?|  '["Non-existent key 1", "Non-existent key 2"]'`)
+		selectWithJsonOper(db, table, `?&  '["言語", "Non-existent key"]'`)
+		selectWithJsonOper(db, table, `?&  '["言語", "言語"]'`)
+		selectWithJsonOper(db, table, `@>  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<@  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `=   '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `!=  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<>  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `>   '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `>=  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<   '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<=  '{"言語":"日本語"}'`)
+	}
+	fmt.Println("")
+}
+
+func TestJsonb(t *testing.T) {
+	fmt.Println("Datatype Test: JSONB")
+	table := table{"jsonb_table", []column{{INT, "id"}, {JSONB, "jsonb_col"}}}
+	_TestJson(table)
+}
+
+func TestJson(t *testing.T) {
+	fmt.Println("Datatype Test: JSON")
+	table := table{"json_table", []column{{INT, "id"}, {JSON, "json_col"}}}
+	_TestJson(table)
+}

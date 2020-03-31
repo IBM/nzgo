@@ -136,35 +136,36 @@ const (
 )
 
 const (
-	NzTypeRecAddr = 1 + iota // !NOTE-bmz need to add this to all switch stmts
-	NzTypeDouble
-	NzTypeInt
-	NzTypeFloat
-	NzTypeMoney
-	NzTypeDate
-	NzTypeNumeric
-	NzTypeTime
-	NzTypeTimestamp
-	NzTypeInterval
-	NzTypeTimeTz
-	NzTypeBool
-	NzTypeInt1
-	NzTypeBinary
-	NzTypeChar
-	NzTypeVarChar
-	NzDEPR_Text // OBSOLETE 3.0: BLAST Era Large 'text' Object
-	// (Postgres 'text' datatype overload, too)
-	NzTypeUnknown // corresponds to PG UNKNOWNOID data type - an untyped string literal
-	NzTypeInt2
-	NzTypeInt8
-	NzTypeVarFixedChar
-	NzTypeGeometry
-	NzTypeVarBinary
-	NzDEPR_Blob // OBSOLETE 3.0: BLAST Era Large 'binary' Object
-	NzTypeNChar
-	NzTypeNVarChar
-	NzDEPR_NText    // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
-	NzTypeLastEntry // KEEP THIS ENTRY LAST - used internally to size an array
+	NzTypeRecAddr      = 1 // !NOTE-bmz need to add this to all switch stmts
+	NzTypeDouble       = 2
+	NzTypeInt          = 3
+	NzTypeFloat        = 4
+	NzTypeMoney        = 5
+	NzTypeDate         = 6
+	NzTypeNumeric      = 7
+	NzTypeTime         = 8
+	NzTypeTimestamp    = 9
+	NzTypeInterval     = 10
+	NzTypeTimeTz       = 11
+	NzTypeBool         = 12
+	NzTypeInt1         = 13
+	NzTypeBinary       = 14
+	NzTypeChar         = 15
+	NzTypeVarChar      = 16
+	NzDEPR_Text        = 17 // OBSOLETE 3.0: BLAST Era Large 'text' Object, (Postgres 'text' datatype overload, too)
+	NzTypeUnknown      = 18 // corresponds to PG UNKNOWNOID data type - an untyped string literal
+	NzTypeInt2         = 19
+	NzTypeInt8         = 20
+	NzTypeVarFixedChar = 21
+	NzTypeGeometry     = 22
+	NzTypeVarBinary    = 23
+	NzDEPR_Blob        = 24 // OBSOLETE 3.0: BLAST Era Large 'binary' Object
+	NzTypeNChar        = 25
+	NzTypeNVarChar     = 26
+	NzDEPR_NText       = 27 // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
+	NzTypeJson         = 30
+	NzTypeJsonb        = 31
+	NzTypeLastEntry    // KEEP THIS ENTRY LAST - used internally to size an array
 )
 
 const (
@@ -176,7 +177,17 @@ const (
 )
 
 /* const to datatype string mapping to use in logger */
-var dataType = map[int]string{NzTypeChar: "NzTypeChar", NzTypeVarChar: "NzTypeVarChar", NzTypeVarFixedChar: "NzTypeVarFixedChar", NzTypeGeometry: "NzTypeGeometry", NzTypeVarBinary: "NzTypeVarBinary", NzTypeNChar: "NzTypeNChar", NzTypeNVarChar: "NzTypeNVarChar"}
+var dataType = map[int]string{
+	NzTypeChar:         "NzTypeChar",
+	NzTypeVarChar:      "NzTypeVarChar",
+	NzTypeVarFixedChar: "NzTypeVarFixedChar",
+	NzTypeGeometry:     "NzTypeGeometry",
+	NzTypeVarBinary:    "NzTypeVarBinary",
+	NzTypeNChar:        "NzTypeNChar",
+	NzTypeNVarChar:     "NzTypeNVarChar",
+	NzTypeJson:         "NzTypeJson",
+	NzTypeJsonb:        "NzTypeJsonb",
+}
 
 const (
 	CP_VERSION_1 = 1 + iota
@@ -2046,13 +2057,16 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			res.dbosTuple = true
 			response, err = cn.recvSingleByte()
 			break
+
 		case 'Y': //	get dbos data tuple
 			res.status = PGRES_TUPLES_OK
 			res.Res_read_dbos_tuple(dest)
 			return /* continue reading */
+
 		case 0:
 			res.done = true
 			return io.EOF
+
 		default:
 			elog.Fatalf(chopPath(funName()), "Unknown response: %d", response)
 		}
@@ -2609,6 +2623,10 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeNChar:
 			fallthrough
 		case NzTypeNVarChar:
+			fallthrough
+		case NzTypeJson:
+			fallthrough
+		case NzTypeJsonb:
 			memsize *= 4
 			memsize = memsize + 1 // for NULL-termination
 			break
@@ -2683,6 +2701,10 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeGeometry:
 			fallthrough
 		case NzTypeVarBinary:
+			fallthrough
+		case NzTypeJson:
+			fallthrough
+		case NzTypeJsonb:
 			cursize := int(binary.LittleEndian.Uint16(fieldDataP)) - 2 //to ignore 2 bytes
 			fieldDataP.next(2)                                         //ignoring 2 bytes
 			dest[field_lf] = ""
@@ -2848,8 +2870,8 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 			fldlen = len(nValStr)
 			elog.Debugf(chopPath(funName()), "field=%d, datatype=NzTypeNumeric, value=%s, len=%d ", cur_field+1, dest[field_lf], fldlen)
 			break
-		case NzTypeBool:
 
+		case NzTypeBool:
 			dest[field_lf] = fieldDataP.byte()
 			elog.Debugf(chopPath(funName()), "field=%d, datatype=BOOL, value=%d, len=%d ", cur_field+1, dest[field_lf], fldlen)
 		}
