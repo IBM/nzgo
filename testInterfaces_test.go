@@ -530,13 +530,17 @@ func drop(db *sql.DB, table table) {
 	}
 }
 
-func selectAll(db *sql.DB, table table) {
-	sqlStatement := fmt.Sprintf(`SELECT * FROM %v`, table.name)
+func _select(db *sql.DB, table table, sqlStatement string) {
 	fmt.Println(sqlStatement)
 	rows, err := db.Query(sqlStatement)
 	checkErr(err)
 	defer rows.Close()
 	printTable(rows)
+}
+
+func selectAll(db *sql.DB, table table) {
+	sqlStatement := fmt.Sprintf(`SELECT * FROM %v`, table.name)
+	_select(db, table, sqlStatement)
 }
 
 func selectWithJsonOper(db *sql.DB, table table, oper string) {
@@ -546,11 +550,17 @@ func selectWithJsonOper(db *sql.DB, table table, oper string) {
 		oper,
 		table.name,
 	)
-	fmt.Println(sqlStatement)
-	rows, err := db.Query(sqlStatement)
-	checkErr(err)
-	defer rows.Close()
-	printTable(rows)
+	_select(db, table, sqlStatement)
+}
+
+func selectWithJsonFunc(db *sql.DB, table table, f string) {
+	sqlStatement := fmt.Sprintf(`SELECT %v, %v(%v) FROM %v`,
+		table.cols[0].name,
+		f,
+		table.cols[1].name,
+		table.name,
+	)
+	_select(db, table, sqlStatement)
 }
 
 func printTable(rows *sql.Rows) {
@@ -632,6 +642,7 @@ func _TestJson(table table) {
 		selectWithJsonOper(db, table, `>=  '{"言語":"日本語"}'`)
 		selectWithJsonOper(db, table, `<   '{"言語":"日本語"}'`)
 		selectWithJsonOper(db, table, `<=  '{"言語":"日本語"}'`)
+		selectWithJsonFunc(db, table, `jsonb_pretty`)
 	}
 	fmt.Println("")
 }
