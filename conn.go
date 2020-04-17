@@ -136,36 +136,38 @@ const (
 )
 
 const (
-	NzTypeRecAddr      = 1 // !NOTE-bmz need to add this to all switch stmts
-	NzTypeDouble       = 2
-	NzTypeInt          = 3
-	NzTypeFloat        = 4
-	NzTypeMoney        = 5
-	NzTypeDate         = 6
-	NzTypeNumeric      = 7
-	NzTypeTime         = 8
-	NzTypeTimestamp    = 9
-	NzTypeInterval     = 10
-	NzTypeTimeTz       = 11
-	NzTypeBool         = 12
-	NzTypeInt1         = 13
-	NzTypeBinary       = 14
-	NzTypeChar         = 15
-	NzTypeVarChar      = 16
-	NzDEPR_Text        = 17 // OBSOLETE 3.0: BLAST Era Large 'text' Object, (Postgres 'text' datatype overload, too)
-	NzTypeUnknown      = 18 // corresponds to PG UNKNOWNOID data type - an untyped string literal
-	NzTypeInt2         = 19
-	NzTypeInt8         = 20
-	NzTypeVarFixedChar = 21
-	NzTypeGeometry     = 22
-	NzTypeVarBinary    = 23
-	NzDEPR_Blob        = 24 // OBSOLETE 3.0: BLAST Era Large 'binary' Object
-	NzTypeNChar        = 25
-	NzTypeNVarChar     = 26
-	NzDEPR_NText       = 27 // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
-	NzTypeJson         = 30
-	NzTypeJsonb        = 31
-	NzTypeLastEntry    // KEEP THIS ENTRY LAST - used internally to size an array
+	NzTypeRecAddr = 1 + iota // !NOTE-bmz need to add this to all switch stmts
+	NzTypeDouble
+	NzTypeInt
+	NzTypeFloat
+	NzTypeMoney
+	NzTypeDate
+	NzTypeNumeric
+	NzTypeTime
+	NzTypeTimestamp
+	NzTypeInterval
+	NzTypeTimeTz
+	NzTypeBool
+	NzTypeInt1
+	NzTypeBinary
+	NzTypeChar
+	NzTypeVarChar
+	NzDEPR_Text   // OBSOLETE 3.0: BLAST Era Large 'text' Object, (Postgres 'text' datatype overload, too)
+	NzTypeUnknown // corresponds to PG UNKNOWNOID data type - an untyped string literal
+	NzTypeInt2
+	NzTypeInt8
+	NzTypeVarFixedChar
+	NzTypeGeometry
+	NzTypeVarBinary
+	NzDEPR_Blob // OBSOLETE 3.0: BLAST Era Large 'binary' Object
+	NzTypeNChar
+	NzTypeNVarChar
+	NzDEPR_NText // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
+	_            // skip 28
+	_            // skip 29
+	NzTypeJson   // 30
+	NzTypeJsonb
+	NzTypeLastEntry // KEEP THIS ENTRY LAST - used internally to size an array
 )
 
 const (
@@ -384,11 +386,11 @@ type conn struct {
 	inCopy bool
 
 	//netezza specific
-	hsVersion     int
-	protocol1     int
-	protocol2     int
-	commandNumber int
-	status        int
+	hsVersion               int
+	protocol1               int
+	protocol2               int
+	commandNumber           int
+	status                  int
 	guardium_clientHostName string
 	guardium_clientOSUser   string
 	guardium_applName       string
