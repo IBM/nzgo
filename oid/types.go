@@ -39,7 +39,6 @@ const (
 	T_varbinary   Oid = 2568
 	T_unkbinary   Oid = 2569
 	T_json        Oid = 2652
-	T_jsonb       Oid = 2653
 )
 
 var TypeName = map[Oid]string{
@@ -79,5 +78,4 @@ var TypeName = map[Oid]string{
 	T_varbinary:   "VARBINARY",
 	T_unkbinary:   "UNKBINARY",
 	T_json:        "JSON",
-	T_jsonb:       "JSONB",
 }

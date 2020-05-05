@@ -162,11 +162,10 @@ const (
 	NzDEPR_Blob // OBSOLETE 3.0: BLAST Era Large 'binary' Object
 	NzTypeNChar
 	NzTypeNVarChar
-	NzDEPR_NText // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
-	_            // skip 28
-	_            // skip 29
-	NzTypeJson   // 30
-	NzTypeJsonb
+	NzDEPR_NText    // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
+	_               // skip 28
+	_               // skip 29
+	NzTypeJson      // 30
 	NzTypeLastEntry // KEEP THIS ENTRY LAST - used internally to size an array
 )
 
@@ -188,7 +187,6 @@ var dataType = map[int]string{
 	NzTypeNChar:        "NzTypeNChar",
 	NzTypeNVarChar:     "NzTypeNVarChar",
 	NzTypeJson:         "NzTypeJson",
-	NzTypeJsonb:        "NzTypeJsonb",
 }
 
 const (
@@ -2665,8 +2663,6 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeNVarChar:
 			fallthrough
 		case NzTypeJson:
-			fallthrough
-		case NzTypeJsonb:
 			memsize *= 4
 			memsize = memsize + 1 // for NULL-termination
 			break
@@ -2743,8 +2739,6 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeVarBinary:
 			fallthrough
 		case NzTypeJson:
-			fallthrough
-		case NzTypeJsonb:
 			cursize := int(binary.LittleEndian.Uint16(fieldDataP)) - 2 //to ignore 2 bytes
 			fieldDataP.next(2)                                         //ignoring 2 bytes
 			dest[field_lf] = ""
