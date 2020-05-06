@@ -14,12 +14,12 @@ const (
 	conninfo = "user=admin " +
 		"port=5480 " +
 		"password=password " +
-		"dbname=system " +
+		"dbname=db2 " +
 		//"host=9.32.247.36 " +
 		//"securityLevel=1 " +
 		//"sslmode=disable"
-		"host=192.168.1.40 " +
-		"securityLevel=0 " +
+		"host=vmnps-dw31.svl.ibm.com " +
+		"securityLevel=3 " +
 		"sslmode=require" //verify-ca sslrootcert=C:/Users/sandeep_pawar/postgresql/root31.crt"
 )
 
@@ -479,8 +479,9 @@ func TestStmt_QueryExecCloseNumInput(t *testing.T) {
 }
 
 const (
-	JSON int = 0
-	INT  int = 1
+	JSON  int = 0
+	JSONB int = 1
+	INT   int = 2
 )
 
 type jsonRow struct {
@@ -552,6 +553,16 @@ func selectWithJsonOper(db *sql.DB, table table, oper string) {
 	_select(db, table, sqlStatement)
 }
 
+func selectWithJsonFunc(db *sql.DB, table table, f string) {
+	sqlStatement := fmt.Sprintf(`SELECT %v, %v(%v) FROM %v`,
+		table.cols[0].name,
+		f,
+		table.cols[1].name,
+		table.name,
+	)
+	_select(db, table, sqlStatement)
+}
+
 func printTable(rows *sql.Rows) {
 	columns, err := rows.Columns()
 	fmt.Printf("%3v | %v\n", columns[0], columns[1])
@@ -573,6 +584,8 @@ func type2Str(typ int) string {
 	switch typ {
 	case JSON:
 		return "JSON"
+	case JSONB:
+		return "JSONB"
 	case INT:
 		return "INT"
 	default:
@@ -605,7 +618,39 @@ func _TestJson(table table) {
 	insert(db, table, 4, `'{"言語":"アラビア語"}'`)
 	insert(db, table, 5, `'{"言語":"Tiếng Việt"}'`)
 	selectAll(db, table)
+	selectWithJsonOper(db, table, `->  '言語'`)
+	selectWithJsonOper(db, table, `->> '言語'`)
+	selectWithJsonOper(db, table, `->  'Non-existent key'`)
+	selectWithJsonOper(db, table, `->> 'Non-existent key'`)
+	if table.cols[1].typ == JSONB {
+		selectWithJsonOper(db, table, `||  '{"cómo estás":"お元気ですか"}'`)
+		selectWithJsonOper(db, table, `-   '言語'::NVARCHAR(100)`)
+		selectWithJsonOper(db, table, `-   '"言語"'`)
+		selectWithJsonOper(db, table, `-   '["言語", "Non-existent key"]'`)
+		selectWithJsonOper(db, table, `?   '言語'`)
+		selectWithJsonOper(db, table, `?   'Non-existent key'`)
+		selectWithJsonOper(db, table, `?|  '["言語", "Non-existent key"]'`)
+		selectWithJsonOper(db, table, `?|  '["Non-existent key 1", "Non-existent key 2"]'`)
+		selectWithJsonOper(db, table, `?&  '["言語", "Non-existent key"]'`)
+		selectWithJsonOper(db, table, `?&  '["言語", "言語"]'`)
+		selectWithJsonOper(db, table, `@>  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<@  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `=   '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `!=  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<>  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `>   '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `>=  '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<   '{"言語":"日本語"}'`)
+		selectWithJsonOper(db, table, `<=  '{"言語":"日本語"}'`)
+		selectWithJsonFunc(db, table, `jsonb_pretty`)
+	}
 	fmt.Println("")
+}
+
+func TestJsonb(t *testing.T) {
+	fmt.Println("Datatype Test: JSONB")
+	table := table{"jsonb_table", []column{{INT, "id"}, {JSONB, "jsonb_col"}}}
+	_TestJson(table)
 }
 
 func TestJson(t *testing.T) {
