@@ -481,12 +481,13 @@ func TestStmt_QueryExecCloseNumInput(t *testing.T) {
 }
 
 const (
-	JSON  int = 0
-	JSONB int = 1
-	INT   int = 2
+	JSON     int = 0
+	JSONB    int = 1
+	INT      int = 2
+	JSONPATH int = 3
 )
 
-type jsonRow struct {
+type row struct {
 	id   sql.NullInt32
 	json sql.NullString
 }
@@ -599,7 +600,7 @@ func printTable(rows *sql.Rows, t *testing.T) {
 	fmt.Printf("----+----------------------------------\n")
 	for rows.Next() {
 		checkErr(false, rows.Err(), t)
-		row := jsonRow{}
+		row := row{}
 		err = rows.Scan(
 			&row.id,
 			&row.json,
@@ -616,6 +617,8 @@ func type2Str(typ int) string {
 		return "JSON"
 	case JSONB:
 		return "JSONB"
+	case JSONPATH:
+		return "JSONPATH"
 	case INT:
 		return "INT"
 	default:
@@ -713,8 +716,34 @@ func setupTable(db *sql.DB, table table, t *testing.T) {
 	insert(db, table, 5, `'{"言語":"Tiếng Việt"}'`, false, t)
 }
 
+func setupJsonpathTable(db *sql.DB, table table, t *testing.T) {
+	sv := serverVersion(db, t)
+	if versionCompare(sv, JSONB_SERVER_VERSION) < 0 && table.cols[1].typ == JSONPATH {
+		t.Skipf("Server does not have JSONPATH support")
+	}
+
+	drop(db, table)
+	create(db, table, false, t)
+	insert(db, table, 1, `'$[0]'`, false, t)
+	insert(db, table, 2, `'$[*].a'`, false, t)
+}
+
 func tearDownTable(db *sql.DB, table table, t *testing.T) {
 	drop(db, table)
+}
+
+func TestJsonpath(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"jsonpath_table", []column{{INT, "id"}, {JSONPATH, "jsonpath_col"}}}
+	setupJsonpathTable(db, table, t)
+
+	selectAll(db, table, false, t)
+
+	tearDownTable(db, table, t)
+
 }
 
 func TestJson(t *testing.T) {
