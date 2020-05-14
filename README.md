@@ -26,6 +26,7 @@ documentation at <https://godoc.org/github.com/IBM/nzgo>.
 * Full external table support (load and unload)
 * Configurable logging feature
 * Prepared statement support
+* Support JSON, JSONB and JSONPATH datatypes
 
 ## Thank you (alphabetical)
 

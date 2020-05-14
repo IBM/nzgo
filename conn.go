@@ -152,8 +152,7 @@ const (
 	NzTypeBinary
 	NzTypeChar
 	NzTypeVarChar
-	NzDEPR_Text // OBSOLETE 3.0: BLAST Era Large 'text' Object
-	// (Postgres 'text' datatype overload, too)
+	NzDEPR_Text   // OBSOLETE 3.0: BLAST Era Large 'text' Object, (Postgres 'text' datatype overload, too)
 	NzTypeUnknown // corresponds to PG UNKNOWNOID data type - an untyped string literal
 	NzTypeInt2
 	NzTypeInt8
@@ -163,7 +162,12 @@ const (
 	NzDEPR_Blob // OBSOLETE 3.0: BLAST Era Large 'binary' Object
 	NzTypeNChar
 	NzTypeNVarChar
-	NzDEPR_NText    // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
+	NzDEPR_NText // OBSOLETE 3.0: BLAST Era Large 'nchar text' Object
+	_            // skip 28
+	_            // skip 29
+	NzTypeJson   // 30
+	NzTypeJsonb
+	NzTypeJsonpath
 	NzTypeLastEntry // KEEP THIS ENTRY LAST - used internally to size an array
 )
 
@@ -176,7 +180,18 @@ const (
 )
 
 /* const to datatype string mapping to use in logger */
-var dataType = map[int]string{NzTypeChar: "NzTypeChar", NzTypeVarChar: "NzTypeVarChar", NzTypeVarFixedChar: "NzTypeVarFixedChar", NzTypeGeometry: "NzTypeGeometry", NzTypeVarBinary: "NzTypeVarBinary", NzTypeNChar: "NzTypeNChar", NzTypeNVarChar: "NzTypeNVarChar"}
+var dataType = map[int]string{
+	NzTypeChar:         "NzTypeChar",
+	NzTypeVarChar:      "NzTypeVarChar",
+	NzTypeVarFixedChar: "NzTypeVarFixedChar",
+	NzTypeGeometry:     "NzTypeGeometry",
+	NzTypeVarBinary:    "NzTypeVarBinary",
+	NzTypeNChar:        "NzTypeNChar",
+	NzTypeNVarChar:     "NzTypeNVarChar",
+	NzTypeJson:         "NzTypeJson",
+	NzTypeJsonb:        "NzTypeJsonb",
+	NzTypeJsonpath:     "NzTypeJsonpath",
+}
 
 const (
 	CP_VERSION_1 = 1 + iota
@@ -373,11 +388,11 @@ type conn struct {
 	inCopy bool
 
 	//netezza specific
-	hsVersion     int
-	protocol1     int
-	protocol2     int
-	commandNumber int
-	status        int
+	hsVersion               int
+	protocol1               int
+	protocol2               int
+	commandNumber           int
+	status                  int
 	guardium_clientHostName string
 	guardium_clientOSUser   string
 	guardium_applName       string
@@ -2084,13 +2099,16 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			res.dbosTuple = true
 			response, err = cn.recvSingleByte()
 			break
+
 		case 'Y': //	get dbos data tuple
 			res.status = PGRES_TUPLES_OK
 			res.Res_read_dbos_tuple(dest)
 			return /* continue reading */
+
 		case 0:
 			res.done = true
 			return io.EOF
+
 		default:
 			elog.Fatalf(chopPath(funName()), "Unknown response: %d", response)
 		}
@@ -2647,6 +2665,12 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeNChar:
 			fallthrough
 		case NzTypeNVarChar:
+			fallthrough
+		case NzTypeJson:
+			fallthrough
+		case NzTypeJsonb:
+			fallthrough
+		case NzTypeJsonpath:
 			memsize *= 4
 			memsize = memsize + 1 // for NULL-termination
 			break
@@ -2721,6 +2745,12 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeGeometry:
 			fallthrough
 		case NzTypeVarBinary:
+			fallthrough
+		case NzTypeJson:
+			fallthrough
+		case NzTypeJsonb:
+			fallthrough
+		case NzTypeJsonpath:
 			cursize := int(binary.LittleEndian.Uint16(fieldDataP)) - 2 //to ignore 2 bytes
 			fieldDataP.next(2)                                         //ignoring 2 bytes
 			dest[field_lf] = ""
@@ -2886,8 +2916,8 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 			fldlen = len(nValStr)
 			elog.Debugf(chopPath(funName()), "field=%d, datatype=NzTypeNumeric, value=%s, len=%d ", cur_field+1, dest[field_lf], fldlen)
 			break
-		case NzTypeBool:
 
+		case NzTypeBool:
 			dest[field_lf] = fieldDataP.byte()
 			elog.Debugf(chopPath(funName()), "field=%d, datatype=BOOL, value=%d, len=%d ", cur_field+1, dest[field_lf], fldlen)
 		}

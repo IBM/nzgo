@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"runtime/debug"
+	"strings"
 	"testing"
 )
 
@@ -24,10 +26,14 @@ const (
 )
 
 func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	return sql.Open("nzgo", conninfostr)
 }
 
 func TestNewConnector_WorksWithOpenDB(t *testing.T) {
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -46,6 +52,8 @@ func TestNewConnector_WorksWithOpenDB(t *testing.T) {
 
 func TestNewConnector_Connect(t *testing.T) {
 	fmt.Println("Interface Function check : Connect()")
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -67,6 +75,8 @@ func TestNewConnector_Connect(t *testing.T) {
 
 func TestNewConnector_Driver(t *testing.T) {
 	fmt.Println("Interface Function check : Driver()")
+	elog := PDALogger{"DEBUG", ""}
+	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -467,5 +477,395 @@ func TestStmt_QueryExecCloseNumInput(t *testing.T) {
 
 	st2, _ := db.Prepare("drop table tdouble if exists;")
 	st2.Exec() //Interface stmt->Exec()
+
+}
+
+const (
+	JSON     int = 0
+	JSONB    int = 1
+	INT      int = 2
+	JSONPATH int = 3
+)
+
+type row struct {
+	id   sql.NullInt32
+	json sql.NullString
+}
+
+type column struct {
+	typ  int
+	name string
+}
+type table struct {
+	name string
+	cols []column
+}
+
+const JSON_SERVER_VERSION = "Release 11.0.3.0"
+
+const JSONB_SERVER_VERSION = "Release 11.2.0.0" // version is new enough (JSONB datatype is not released yet)
+
+const JSON_OPER_SERVER_VERSION = JSONB_SERVER_VERSION
+
+func checkErr(expErr bool, err error, t *testing.T) {
+	if expErr && err == nil {
+		t.Log(`Expect error, but there was no error.`)
+	} else if !expErr && err != nil {
+		t.Logf(`Expect no error, but have error "%s".`, err)
+	} else {
+		return
+	}
+	t.Fatalf(string(debug.Stack()))
+}
+
+func query(db *sql.DB, sqlStatement string, expErr bool, t *testing.T) (error, *sql.Rows) {
+	fmt.Println(sqlStatement)
+	rows, err := db.Query(sqlStatement)
+	checkErr(expErr, err, t)
+	return err, rows
+}
+
+func exec(db *sql.DB, sqlStatement string, expErr bool, t *testing.T) error {
+	fmt.Println(sqlStatement)
+	_, err := db.Exec(sqlStatement)
+	checkErr(expErr, err, t)
+	return err
+}
+
+func _select(db *sql.DB, sqlStatement string, expErr bool, t *testing.T) {
+	err, rows := query(db, sqlStatement, expErr, t)
+	if err == nil {
+		defer rows.Close()
+		printTable(rows, t)
+	} else {
+		fmt.Println(err)
+	}
+}
+
+func insert(db *sql.DB, table table, val1 int, val2 string, expErr bool, t *testing.T) {
+	sqlStatement := fmt.Sprintf(`INSERT INTO %v(%v, %v) VALUES (%v, %v)`,
+		table.name,
+		table.cols[0].name,
+		table.cols[1].name,
+		val1,
+		val2)
+	fmt.Println(sqlStatement)
+	res, err := db.Exec(sqlStatement)
+	checkErr(expErr, err, t)
+	rowsAffected, err := res.RowsAffected()
+	checkErr(expErr, err, t)
+	fmt.Printf("INSERT %v\n", rowsAffected)
+}
+
+func drop(db *sql.DB, table table) {
+	sqlStatement := fmt.Sprintf(`DROP TABLE %v IF EXISTS`, table.name)
+	fmt.Println(sqlStatement)
+	_, err := db.Exec(sqlStatement)
+	if err != nil {
+		fmt.Println("ERROR: ", err)
+	} else {
+		fmt.Println("DROP TABLE")
+	}
+}
+
+func selectAll(db *sql.DB, table table, expErr bool, t *testing.T) {
+	sqlStatement := fmt.Sprintf(`SELECT * FROM %v`, table.name)
+	_select(db, sqlStatement, expErr, t)
+}
+
+func selectWithJsonOper(db *sql.DB, table table, oper string, expErr bool, t *testing.T) {
+	sqlStatement := fmt.Sprintf(`SELECT %v, %v %v FROM %v`,
+		table.cols[0].name,
+		table.cols[1].name,
+		oper,
+		table.name,
+	)
+	_select(db, sqlStatement, expErr, t)
+}
+
+func selectWithJsonFunc(db *sql.DB, table table, f string, expErr bool, t *testing.T) {
+	sqlStatement := fmt.Sprintf(`SELECT %v, %v(%v) FROM %v`,
+		table.cols[0].name,
+		f,
+		table.cols[1].name,
+		table.name,
+	)
+	_select(db, sqlStatement, expErr, t)
+}
+
+func printTable(rows *sql.Rows, t *testing.T) {
+	columns, err := rows.Columns()
+	checkErr(false, err, t)
+	fmt.Printf("%3v | %v\n", columns[0], columns[1])
+	fmt.Printf("----+----------------------------------\n")
+	for rows.Next() {
+		checkErr(false, rows.Err(), t)
+		row := row{}
+		err = rows.Scan(
+			&row.id,
+			&row.json,
+		)
+		checkErr(false, err, t)
+
+		fmt.Printf("%3v | %v\n", row.id.Int32, row.json.String)
+	}
+}
+
+func type2Str(typ int) string {
+	switch typ {
+	case JSON:
+		return "JSON"
+	case JSONB:
+		return "JSONB"
+	case JSONPATH:
+		return "JSONPATH"
+	case INT:
+		return "INT"
+	default:
+		panic("type2Str: Unknown datatype")
+	}
+}
+
+func create(db *sql.DB, table table, expErr bool, t *testing.T) {
+	sqlStatement := fmt.Sprintf(`CREATE TABLE %v(%v %v, %v %v)`,
+		table.name,
+		table.cols[0].name,
+		type2Str(table.cols[0].typ),
+		table.cols[1].name,
+		type2Str(table.cols[1].typ))
+	fmt.Println(sqlStatement)
+	_, err := db.Exec(sqlStatement)
+	checkErr(expErr, err, t)
+	fmt.Println("CREATE TABLE")
+}
+
+func serverVersion(db *sql.DB, t *testing.T) string {
+	err, rows := query(db, `select system_software_version from _v_system_info`, false, t)
+	if err != nil {
+		t.Fatalf("Failed to get server version")
+	}
+	_, err = rows.Columns()
+	checkErr(false, err, t)
+	ret := ""
+	if rows.Next() {
+		checkErr(false, rows.Err(), t)
+		err = rows.Scan(&ret)
+		checkErr(false, err, t)
+	}
+	return ret
+}
+
+func versionCompare(v1 string, v2 string) int {
+	var major1, minor1, sub_minor1, variant1 int = 0, 0, 0, 0
+	var major2, minor2, sub_minor2, variant2 int = 0, 0, 0, 0
+	_, err := fmt.Sscanf(strings.Split(v1, " ")[1], "%d.%d.%d.%d", &major1, &minor1, &sub_minor1, &variant1)
+	if err != nil {
+		return -1
+	}
+	_, err = fmt.Sscanf(strings.Split(v2, " ")[1], "%d.%d.%d.%d", &major2, &minor2, &sub_minor2, &variant2)
+	if err != nil {
+		return -1
+	}
+
+	if (major1 == major2) && (minor1 == minor2) && (sub_minor1 == sub_minor2) && (variant1 == variant2) {
+		return 0
+	}
+
+	if major1 > major2 {
+		return 1
+	}
+	if major1 < major2 {
+		return -1
+	} else {
+		if minor1 > minor2 {
+			return 1
+		}
+		if minor1 < minor2 {
+			return -1
+		} else {
+			if sub_minor1 > sub_minor2 {
+				return 1
+			}
+			if sub_minor1 < sub_minor2 {
+				return -1
+			} else {
+				if variant1 > variant2 {
+					return 1
+				} else {
+					return -1
+				}
+			}
+		}
+	}
+}
+
+func setupTable(db *sql.DB, table table, t *testing.T) {
+	sv := serverVersion(db, t)
+	if versionCompare(sv, JSON_SERVER_VERSION) < 0 && table.cols[1].typ == JSON {
+		t.Skipf("Server does not have JSON support")
+	} else if versionCompare(sv, JSONB_SERVER_VERSION) < 0 && table.cols[1].typ == JSONB {
+		t.Skipf("Server does not have JSONB support")
+	}
+
+	drop(db, table)
+	create(db, table, false, t)
+	insert(db, table, 1, `'{"言語":"日本語"}'`, false, t)
+	insert(db, table, 2, `'{"言語":"中文"}'`, false, t)
+	insert(db, table, 3, `'{"言語":"русский"}'`, false, t)
+	insert(db, table, 4, `'{"言語":"アラビア語"}'`, false, t)
+	insert(db, table, 5, `'{"言語":"Tiếng Việt"}'`, false, t)
+}
+
+func setupJsonpathTable(db *sql.DB, table table, t *testing.T) {
+	sv := serverVersion(db, t)
+	if versionCompare(sv, JSONB_SERVER_VERSION) < 0 && table.cols[1].typ == JSONPATH {
+		t.Skipf("Server does not have JSONPATH support")
+	}
+
+	drop(db, table)
+	create(db, table, false, t)
+	insert(db, table, 1, `'$[0]'`, false, t)
+	insert(db, table, 2, `'$[*].a'`, false, t)
+}
+
+func tearDownTable(db *sql.DB, table table, t *testing.T) {
+	drop(db, table)
+}
+
+func TestJsonpath(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"jsonpath_table", []column{{INT, "id"}, {JSONPATH, "jsonpath_col"}}}
+	setupJsonpathTable(db, table, t)
+
+	selectAll(db, table, false, t)
+
+	tearDownTable(db, table, t)
+
+}
+
+func TestJson(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"json_table", []column{{INT, "id"}, {JSON, "json_col"}}}
+	setupTable(db, table, t)
+
+	selectAll(db, table, false, t)
+
+	tearDownTable(db, table, t)
+
+	}
+
+func TestJsonb(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"jsonb_table", []column{{INT, "id"}, {JSONB, "jsonb_col"}}}
+	setupTable(db, table, t)
+
+	selectAll(db, table, false, t)
+
+	tearDownTable(db, table, t)
+
+}
+
+func TestJsonbOperator(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"jsonb_table", []column{{INT, "id"}, {JSONB, "jsonb_col"}}}
+	setupTable(db, table, t)
+
+	selectWithJsonOper(db, table, `||  '{"cómo estás":"お元気ですか"}'`, false, t)
+	selectWithJsonOper(db, table, `-   '言語'::NVARCHAR(100)`, false, t)
+	selectWithJsonOper(db, table, `-   '"言語"'`, false, t)
+	selectWithJsonOper(db, table, `-   '["言語", "Non-existent key"]'`, false, t)
+	selectWithJsonOper(db, table, `?   '言語'`, false, t)
+	selectWithJsonOper(db, table, `?   'Non-existent key'`, false, t)
+	selectWithJsonOper(db, table, `?|  '["言語", "Non-existent key"]'`, false, t)
+	selectWithJsonOper(db, table, `?|  '["Non-existent key 1", "Non-existent key 2"]'`, false, t)
+	selectWithJsonOper(db, table, `?&  '["言語", "Non-existent key"]'`, false, t)
+	selectWithJsonOper(db, table, `?&  '["言語", "言語"]'`, false, t)
+	selectWithJsonOper(db, table, `@>  '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `<@  '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `=   '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `!=  '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `<>  '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `>   '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `>=  '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `<   '{"言語":"日本語"}'`, false, t)
+	selectWithJsonOper(db, table, `<=  '{"言語":"日本語"}'`, false, t)
+	selectWithJsonFunc(db, table, `jsonb_pretty`, false, t)
+
+	tearDownTable(db, table, t)
+
+}
+
+func TestJsonOperator(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"json_table", []column{{INT, "id"}, {JSON, "json_col"}}}
+	setupTable(db, table, t)
+
+	sv := serverVersion(db, t)
+	if versionCompare(sv, JSON_OPER_SERVER_VERSION) < 0 {
+		t.Skipf("Server does not have JSON operator support")
+	}
+
+	selectWithJsonOper(db, table, `->  '言語'`, false, t)
+	selectWithJsonOper(db, table, `->> '言語'`, false, t)
+	selectWithJsonOper(db, table, `->  'Non-existent key'`, false, t)
+	selectWithJsonOper(db, table, `->> 'Non-existent key'`, false, t)
+
+	tearDownTable(db, table, t)
+
+}
+
+func TestJsonClientVersion(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"json_table", []column{{INT, "id"}, {JSON, "json_col"}}}
+	setupTable(db, table, t)
+
+	exec(db, fmt.Sprintf("SET CLIENT_VERSION = '%s'", "Release 11.0.10.0"), false, t) // without JSON
+	selectAll(db, table, true, t)                                                     // expect error
+
+	exec(db, fmt.Sprintf("SET CLIENT_VERSION = '%s'", "Release 11.1.0.0"), false, t) // with JSON
+	selectAll(db, table, false, t)                                                   // ok
+
+	exec(db, fmt.Sprintf("SET CLIENT_VERSION = '%s'", "Release 11.1.1.0"), false, t) // Future versions, with JSON
+	selectAll(db, table, false, t)                                                   // ok
+
+	tearDownTable(db, table, t)
+
+}
+
+func TestJsonBackwardCompatibility(t *testing.T) {
+	db, err := openTestConnConninfo(conninfo)
+
+	checkErr(false, err, t)
+	defer db.Close()
+
+	table := table{"json_table", []column{{INT, "id"}, {JSON, "json_col"}}}
+	setupTable(db, table, t)
+
+	exec(db, fmt.Sprintf("SET CLIENT_VERSION = '%s'", "Release 11.0.10.0"), false, t) // no JSON
+	selectAll(db, table, true, t)                                                     // expect error
+
+	exec(db, "SET DATATYPE_BACKWARD_COMPATIBILITY ON", false, t)
+	selectAll(db, table, false, t) // ok
+
+	tearDownTable(db, table, t)
 
 }

@@ -92,7 +92,7 @@ func binaryDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) inter
 
 func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interface{} {
 	switch typ {
-	case oid.T_char, oid.T_bpchar, oid.T_varchar, oid.T_nvarchar, oid.T_text, oid.T_name, oid.T_oid:
+	case oid.T_char, oid.T_bpchar, oid.T_varchar, oid.T_nvarchar, oid.T_text, oid.T_name, oid.T_oid, oid.T_json, oid.T_jsonb, oid.T_jsonpath:
 		return string(s)
 	case oid.T_bytea:
 		b, err := parseBytea(s)
