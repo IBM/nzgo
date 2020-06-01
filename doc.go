@@ -22,6 +22,24 @@ using this package directly. For example:
 		…
 	}
 
+Logging
+
+nzgo defines a simple logger interface. Set LogLevel to control logging verbosity and LogPath to specify log file path.
+In order to enable logging for the driver, you need to write below code in your application
+
+    var elog nzgo.PDALogger
+    elog.LogLevel = "off"
+    elog.LogPath = "C:\\Logs\\"
+    elog.Initialize()
+
+Declaring elog variable and calling elog.Initialize() function is mandatory else application would fail with error "runtime error: invalid memory address or nil pointer dereference".
+
+You can configure LogLevel and LogPath (i.e. log file directory) as per your requirement.
+
+You may skip initializing LogLevel and LogPath values. In such case, it would take default values. Default value for LogLevel is DEBUG
+while for LogPath is same directory as your application.
+
+Other valid values for 'LogLevel' are : "OFF" , "DEBUG", "INFO" and "FATAL"
 
 SecurityLevel
 
@@ -180,26 +198,6 @@ Below query would create a file 'et1.txt' on remote system from Netezza table t2
 
 See https://www.ibm.com/support/knowledgecenter/en/SSULQD_7.2.1/com.ibm.nz.load.doc/t_load_unloading_data_remote_client_sys.html
 for more information about external table
-
-
-Logging
-
-nzgo defines a simple logger interface. Set LogLevel to control logging verbosity and LogPath to specify log file path.
-In order to enable logging for the driver, you need to write below code in your application
-
-    var elog nzgo.PDALogger
-    elog.LogLevel = "off"
-    elog.LogPath = "C:\\Logs\\"
-    elog.Initialize()
-
-Declaring elog variable and calling elog.Initialize() function is mandatory else application would fail with error "runtime error: invalid memory address or nil pointer dereference".
-
-You can configure LogLevel and LogPath (i.e. log file directory) as per your requirement.
-
-You may skip initializing LogLevel and LogPath values. In such case, it would take default values. Default value for LogLevel is DEBUG
-while for LogPath is same directory as your application.
-
-Other valid values for 'LogLevel' are : "OFF" , "DEBUG", "INFO" and "FATAL"
 
 */
 package nzgo
