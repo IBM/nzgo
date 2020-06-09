@@ -13,16 +13,13 @@ import (
 )
 
 const (
-	conninfo = "user=admin " +
-		"port=5480 " +
-		"password=password " +
-		"dbname=db2 " +
-		//"host=9.32.247.36 " +
-		//"securityLevel=1 " +
-		//"sslmode=disable"
-		"host=vmnps-dw31.svl.ibm.com " +
-		"securityLevel=3 " +
-		"sslmode=require" //verify-ca sslrootcert=C:/Users/sandeep_pawar/postgresql/root31.crt"
+	conninfo = "user= " +
+		"port= " +
+		"password= " +
+		"dbname= " +
+		"host= " +
+		"securityLevel= " +
+		"sslmode= "
 )
 
 func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
@@ -758,7 +755,7 @@ func TestJson(t *testing.T) {
 
 	tearDownTable(db, table, t)
 
-	}
+}
 
 func TestJsonb(t *testing.T) {
 	db, err := openTestConnConninfo(conninfo)
