@@ -393,6 +393,7 @@ type conn struct {
 	protocol2               int
 	commandNumber           int
 	status                  int
+        socketfd      int
 	guardium_clientHostName string
 	guardium_clientOSUser   string
 	guardium_applName       string
@@ -550,6 +551,24 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 			cn.c.Close()
 		}
 		return nil, err
+	}
+        switch c := cn.c.(type) {
+	case *net.TCPConn:
+		if runtime.GOOS == "linux" {
+			fh, _ := c.File()
+			cn.socketfd = int(fh.Fd())
+		} else if runtime.GOOS == "windows" {
+			rawConn, _ := c.SyscallConn()
+			fdCh := make(chan uintptr, 1)
+			err = rawConn.Control(func(fd uintptr) {
+				fdCh <- fd
+			})
+			if err != nil {
+				panic(err)
+			}
+			fd := <-fdCh
+			cn.socketfd = int(fd)
+		}
 	}
 	// cn.startup panics on error. Make sure we don't leak cn.c.
 	panicking := true
@@ -3042,8 +3061,14 @@ func (cn *conn) Conn_authenticate(o values) bool {
 		elog.Debugln(chopPath(funName()), "Encoded(Base 64bit) ", sFinal)
 
 		w.string(sFinal)
-		cn.send(w)                          //send md5 encoded hash
+		cn.send(w)                          //send sha256 encoded hash
 		res = cn.Conn_processAuthResponse() //process server response
+
+        case AUTH_REQ_KRB5:
+		elog.Debugln(chopPath(funName()), "Authenticating using Krb5")
+		cn.go_krb5_sendauth(o["host"], o["user"])
+		res = cn.Conn_processAuthResponse()
+		break
 
 	default:
 		elog.Fatalf(chopPath(funName()), "Unknown authentication response: %d", code)
