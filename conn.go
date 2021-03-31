@@ -1481,7 +1481,7 @@ func (cn *conn) query(query string, args []driver.Value) (_ *rows, err error) {
 		return rows, nil
 	}
 	st := cn.prepareTo(query, "")
-	st.exec(args)
+	st.Query(args)
 	return &rows{
 		cn:         cn,
 		rowsHeader: st.rowsHeader,
