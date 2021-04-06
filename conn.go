@@ -2717,7 +2717,6 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 			byteBuf := make([]byte, fldlen)
 			copy(byteBuf, fieldDataP.next(fldlen)) //make a copy
 
-			byteBuf = append(byteBuf, 0)
 			dest[field_lf] = string(byteBuf)
 			elog.Debugf(chopPath(funName()), "field=%d, datatype=CHAR, value=%s, len=%d ", cur_field+1, dest[field_lf], fldlen)
 
@@ -2734,7 +2733,6 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 				byteBuf = append(byteBuf, ' ')
 				cursize++
 			}
-			byteBuf = append(byteBuf, 0)
 			dest[field_lf] = string(byteBuf)
 			elog.Debugf(chopPath(funName()), "field=%d, datatype=%s, value=%s, len=%d ", cur_field+1, dataType[fldtype], dest[field_lf], fldlen)
 
@@ -2756,7 +2754,6 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 			dest[field_lf] = ""
 			byteBuf := make([]byte, cursize)
 			copy(byteBuf, fieldDataP.next(cursize)) //make a copy
-			byteBuf = append(byteBuf, 0)
 
 			dest[field_lf] = string(byteBuf)
 			fldlen = cursize
