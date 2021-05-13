@@ -75,7 +75,7 @@ The Go Netezza Driver supports the following connection syntaxes (or data source
 
  "host=localhost user=admin dbname=db1 port=5480 password=password sslmode=require sslrootcert=C:/Users/root31.crt securityLevel=3"
 
-The above example opens a database handle on NPS server 'localhost'.
+In this case, application is running from NPS server itself so using 'localhost'.
 Golang driver should connect on port 5480(postgres port). The user is admin,
 password is password, database is db1, sslmode is require, and the location of the root
 certificate file is C:/Users/root31.crt with securityLevel as 'Only Secured session'
