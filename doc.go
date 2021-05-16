@@ -27,7 +27,7 @@ Logging
 nzgo defines a simple logger interface. Set LogLevel to control logging verbosity and LogPath to specify log file path.
 In order to enable logging for the driver, you need to write below code in your application
 
-    var elog nzgo.PDALogger
+    var elog nzgo.NZLogger
     elog.LogLevel = "off"
     elog.LogPath = "C:\\Logs\\"
     elog.Initialize()

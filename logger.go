@@ -18,12 +18,12 @@ var (
 )
 
 /*Valid log levels : DEBUG, INFO, FATAL, OFF*/
-type PDALogger struct {
+type NZLogger struct {
 	LogLevel string
 	LogPath  string
 }
 
-var elog PDALogger
+var elog NZLogger
 
 /* Create logger handler with some predefined prefix setting,
  * this will be overwritten in actual logging.
@@ -45,7 +45,7 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog PDALogger) Initialize() {
+func (elog NZLogger) Initialize() {
 
 	var fname string
 	/* Overwrite log level mentioned in conf, if its blank use default case */
@@ -106,7 +106,7 @@ func prefixString() string {
 }
 
 /* Wrappers to print functions to change pefix format */
-func (elog PDALogger) Debugf(fname string, s string, args ...interface{}) {
+func (elog NZLogger) Debugf(fname string, s string, args ...interface{}) {
 	prefixStr := prefixString() + "[DEBUG] " + fname + " "
 	Debug.SetFlags(0)
 	Debug.SetPrefix(prefixStr)
@@ -115,7 +115,7 @@ func (elog PDALogger) Debugf(fname string, s string, args ...interface{}) {
 }
 
 /* Used for adding debug log without format */
-func (elog PDALogger) Debugln(args ...interface{}) {
+func (elog NZLogger) Debugln(args ...interface{}) {
 	prefixStr := prefixString() + "[DEBUG] "
 	Debug.SetFlags(0)
 	Debug.SetPrefix(prefixStr)
@@ -124,7 +124,7 @@ func (elog PDALogger) Debugln(args ...interface{}) {
 }
 
 /* Info logger adds messages for client */
-func (elog PDALogger) infof(s string, args ...interface{}) {
+func (elog NZLogger) infof(s string, args ...interface{}) {
 	prefixStr := prefixString() + "[INFO] : "
 	Info.SetFlags(0)
 	Info.SetPrefix(prefixStr)
@@ -132,7 +132,7 @@ func (elog PDALogger) infof(s string, args ...interface{}) {
 	Info.Printf(s, args...)
 }
 
-func (elog PDALogger) Infoln(args ...interface{}) {
+func (elog NZLogger) Infoln(args ...interface{}) {
 	prefixStr := prefixString() + "[INFO] : "
 	Info.SetFlags(0)
 	Info.SetPrefix(prefixStr)
@@ -141,7 +141,7 @@ func (elog PDALogger) Infoln(args ...interface{}) {
 }
 
 /* Fatal logs error and panic, forcing application to exit with message on stdout */
-func (elog PDALogger) Fatalf(fname string, s string, args ...interface{}) {
+func (elog NZLogger) Fatalf(fname string, s string, args ...interface{}) {
 	prefixStr := prefixString() + "[FATAL] " + fname + " "
 	Fatal.SetFlags(0)
 	Fatal.SetPrefix(prefixStr)
@@ -149,7 +149,7 @@ func (elog PDALogger) Fatalf(fname string, s string, args ...interface{}) {
 	Fatal.Panic(fmt.Sprintf(s, args...))
 }
 
-func (elog PDALogger) Fatalln(args ...interface{}) {
+func (elog NZLogger) Fatalln(args ...interface{}) {
 	prefixStr := prefixString() + "[FATAL] "
 	Fatal.SetFlags(0)
 	Fatal.SetPrefix(prefixStr)
