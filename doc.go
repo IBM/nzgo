@@ -73,9 +73,9 @@ Use Open to create a database handle with connection parameters:
 
 The Go Netezza Driver supports the following connection syntaxes (or data source name formats):
 
- "host=vmnps-dw10.svl.ibm.com user=admin dbname=db1 port=5480 password=password sslmode=require sslrootcert=C:/Users/root31.crt securityLevel=3"
+ "host=localhost user=admin dbname=db1 port=5480 password=password sslmode=require sslrootcert=C:/Users/root31.crt securityLevel=3"
 
-The above example opens a database handle on NPS server 'vmnps-dw10.svl.ibm.com'.
+In this case, application is running from NPS server itself so using 'localhost'.
 Golang driver should connect on port 5480(postgres port). The user is admin,
 password is password, database is db1, sslmode is require, and the location of the root
 certificate file is C:/Users/root31.crt with securityLevel as 'Only Secured session'
