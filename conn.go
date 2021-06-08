@@ -2089,7 +2089,11 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			cn.saveMessage(response, &responseBuf)
 			res.readTuples(dest)
 			return
-
+		case 'E':
+			cn.recv_n_bytes(4)
+			length, _ := cn.recv_n_bytes(4)
+			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
+			elog.Fatalf(chopPath(funName()), "%s", responseBuf.string())
 		case 'X': //	get dbos tuple descriptor
 			cn.recv_n_bytes(4)
 			length, _ := cn.recv_n_bytes(4)
