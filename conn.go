@@ -2093,7 +2093,13 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			cn.recv_n_bytes(4)
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
-			elog.Fatalf(chopPath(funName()), "%s", responseBuf.string())
+			errorString := responseBuf.string()
+			err = errors.New(errorString)
+			elog.Infoln(funName(), errorString)
+			return err
+		case 'Z': /* Backend is ready for new query (6.4) */
+			return err
+
 		case 'X': //	get dbos tuple descriptor
 			cn.recv_n_bytes(4)
 			length, _ := cn.recv_n_bytes(4)
