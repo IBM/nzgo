@@ -53,7 +53,7 @@ func (elog NZLogger) Initialize() {
 		elog.LogLevel = strings.ToUpper(elog.LogLevel)
 	} else {
 		/* Set loglevel here, invalid loglevel will discard all log messages */
-		elog.LogLevel = "DEBUG" //This is default log level
+		elog.LogLevel = "INFO" //This is default log level
 	}
 
 	/* If Loglevel is OFF or anything other than DEBUG INFO OR FATAL then no log file would be created */
