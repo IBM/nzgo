@@ -49,7 +49,7 @@ func Init() {
 func (elog NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 	elog.LogLevel = logLevel
 	elog.LogPath = logPath
-	elog.AdditionalLogFile = logFile
+	elog.AdditionalLogFile = additionalLogFile
 
 	var fname string
 	/* Overwrite log level mentioned in conf, if its blank use default case */
@@ -78,8 +78,8 @@ func (elog NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 		errorf("Error opening logger file")
 	}
 	var additionalFh *os.File
-	if elog.LogFile != "" {
-		additionalFh, err = os.OpenFile(elog.LogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if elog.AdditionalLogFile != "" {
+		additionalFh, err = os.OpenFile(elog.AdditionalLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			errorf("Error opening logger file")
 		}
