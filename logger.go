@@ -21,6 +21,7 @@ var (
 type NZLogger struct {
 	LogLevel string
 	LogPath  string
+	LogFile  string
 }
 
 var elog NZLogger
@@ -73,19 +74,34 @@ func (elog NZLogger) Initialize() {
 	if err != nil {
 		errorf("Error opening logger file")
 	}
-	logBanner(fh)
+	var additionalFh *os.File
+	if elog.LogFile != "" {
+		additionalFh, err = os.OpenFile(elog.LogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			errorf("Error opening logger file")
+		}
+	}
+
+	var multiFileHandler io.Writer
+	if additionalFh != nil {
+		multiFileHandler = io.MultiWriter(fh, additionalFh)
+	} else {
+		multiFileHandler = io.MultiWriter(fh)
+	}
+
+	logBanner(multiFileHandler)
 
 	Init()
 	switch elog.LogLevel {
 	// Sequence of log level case matters. Should not be changed
 	case "DEBUG":
-		Debug.SetOutput(fh)
+		Debug.SetOutput(multiFileHandler)
 		fallthrough
 	case "INFO":
-		Info.SetOutput(fh)
+		Info.SetOutput(multiFileHandler)
 		fallthrough
 	case "FATAL":
-		Fatal.SetOutput(fh)
+		Fatal.SetOutput(multiFileHandler)
 
 		// case default : //It will do nothing to discard the log output but log file with banner will be generated
 	}
