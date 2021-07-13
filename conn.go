@@ -732,7 +732,7 @@ func parseOpts(name string, o values) error {
 
 	elog.Initialize(o["LogLevel"], o["LogPath"], o["AdditionalLogFile"])
 
-	elog.Infoln("Setup : ", name, o)
+	elog.Infoln("Setup Config: ", o)
 	return nil
 }
 
