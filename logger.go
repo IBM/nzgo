@@ -46,7 +46,10 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog NZLogger) Initialize() {
+func (elog NZLogger) Initialize(logLevel, logPath, logFile string) {
+	elog.LogLevel = logLevel
+	elog.LogPath = logPath
+	elog.LogFile = logFile
 
 	var fname string
 	/* Overwrite log level mentioned in conf, if its blank use default case */

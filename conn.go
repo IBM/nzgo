@@ -269,13 +269,6 @@ const (
 	NPSCLIENT_TYPE_GOLANG = 12
 )
 
-//Configuration setup
-type Configuration struct {
-	LogLevel string
-}
-
-var configuration Configuration
-
 // Driver is the Postgres database driver.
 type Driver struct{}
 
@@ -665,7 +658,6 @@ func (s *scanner) SkipSpaces() (rune, bool) {
 //
 // The parsing code is based on conninfo_parse from libpq's fe-connect.c
 func parseOpts(name string, o values) error {
-	elog.Infoln("Setup : ", name, o)
 	s := newScanner(name)
 
 	for {
@@ -738,6 +730,9 @@ func parseOpts(name string, o values) error {
 		o[string(keyRunes)] = string(valRunes)
 	}
 
+	elog.Initialize(o["LogLevel"], o["LogPath"], o["LogFile"])
+
+	elog.Infoln("Setup : ", name, o)
 	return nil
 }
 
