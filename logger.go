@@ -19,9 +19,9 @@ var (
 
 /*Valid log levels : DEBUG, INFO, FATAL, OFF*/
 type NZLogger struct {
-	LogLevel string
-	LogPath  string
-	LogFile  string
+	LogLevel          string
+	LogPath           string
+	AdditionalLogFile string
 }
 
 var elog NZLogger
@@ -46,10 +46,10 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog NZLogger) Initialize(logLevel, logPath, logFile string) {
+func (elog NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 	elog.LogLevel = logLevel
 	elog.LogPath = logPath
-	elog.LogFile = logFile
+	elog.AdditionalLogFile = logFile
 
 	var fname string
 	/* Overwrite log level mentioned in conf, if its blank use default case */
