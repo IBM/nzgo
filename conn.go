@@ -732,7 +732,6 @@ func parseOpts(name string, o values) error {
 
 	elog.Initialize(o["LogLevel"], o["LogPath"], o["AdditionalLogFile"])
 
-	elog.Infoln("Setup Config: ", o)
 	return nil
 }
 
@@ -1731,7 +1730,6 @@ func (cn *conn) startup(o values) (err error) {
 	// user we want to connect as.  Additionally, we send over any run-time
 	// parameters potentially included in the connection string.  If the server
 	// doesn't recognize any of them, it will reply with an error.
-	elog.Infoln("Backend setting info ", o)
 	elog.Infoln("Starting handshake negotiation with server")
 	versionPacket := HsVersion{
 		opcode:  HSV2_CLIENT_BEGIN,
