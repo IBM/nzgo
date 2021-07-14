@@ -269,13 +269,6 @@ const (
 	NPSCLIENT_TYPE_GOLANG = 12
 )
 
-//Configuration setup
-type Configuration struct {
-	LogLevel string
-}
-
-var configuration Configuration
-
 // Driver is the Postgres database driver.
 type Driver struct{}
 
@@ -665,7 +658,6 @@ func (s *scanner) SkipSpaces() (rune, bool) {
 //
 // The parsing code is based on conninfo_parse from libpq's fe-connect.c
 func parseOpts(name string, o values) error {
-	elog.Infoln("Setup : ", name, o)
 	s := newScanner(name)
 
 	for {
@@ -737,6 +729,8 @@ func parseOpts(name string, o values) error {
 
 		o[string(keyRunes)] = string(valRunes)
 	}
+
+	elog.Initialize(o["logLevel"], o["logPath"], o["additionalLogFile"])
 
 	return nil
 }
@@ -1736,7 +1730,6 @@ func (cn *conn) startup(o values) (err error) {
 	// user we want to connect as.  Additionally, we send over any run-time
 	// parameters potentially included in the connection string.  If the server
 	// doesn't recognize any of them, it will reply with an error.
-	elog.Infoln("Backend setting info ", o)
 	elog.Infoln("Starting handshake negotiation with server")
 	versionPacket := HsVersion{
 		opcode:  HSV2_CLIENT_BEGIN,

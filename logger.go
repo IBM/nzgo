@@ -19,9 +19,9 @@ var (
 
 /*Valid log levels : DEBUG, INFO, FATAL, OFF*/
 type NZLogger struct {
-	LogLevel string
-	LogPath  string
-	LogFile  string
+	LogLevel          string
+	LogPath           string
+	AdditionalLogFile string
 }
 
 var elog NZLogger
@@ -46,7 +46,10 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog NZLogger) Initialize() {
+func (elog NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
+	elog.LogLevel = logLevel
+	elog.LogPath = logPath
+	elog.AdditionalLogFile = additionalLogFile
 
 	var fname string
 	/* Overwrite log level mentioned in conf, if its blank use default case */
@@ -75,8 +78,8 @@ func (elog NZLogger) Initialize() {
 		errorf("Error opening logger file")
 	}
 	var additionalFh *os.File
-	if elog.LogFile != "" {
-		additionalFh, err = os.OpenFile(elog.LogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if elog.AdditionalLogFile != "" {
+		additionalFh, err = os.OpenFile(elog.AdditionalLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			errorf("Error opening logger file")
 		}
