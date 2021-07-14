@@ -730,7 +730,7 @@ func parseOpts(name string, o values) error {
 		o[string(keyRunes)] = string(valRunes)
 	}
 
-	elog.Initialize(o["LogLevel"], o["LogPath"], o["AdditionalLogFile"])
+	elog.Initialize(o["logLevel"], o["logPath"], o["additionalLogFile"])
 
 	return nil
 }
