@@ -10,12 +10,24 @@ import (
 	"path/filepath"
 )
 
+const (
+	TLS1_CK_RSA_WITH_AES_128_GCM_SHA256     = 0x09C
+	TLS1_CK_RSA_WITH_AES_128_SHA256         = 0x03c
+	TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256 = 0xc023
+	TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256   = 0xc027
+)
+
 // ssl generates a function to upgrade a net.Conn based on the "sslmode" and
 // related settings. The function is nil when no upgrade should take place.
 func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
 	verifyCaOnly := false
 	tlsConf := tls.Config{}
-	tlsConf.CipherSuites = []uint16{0x003c, 0xc023, 0xc027}
+	tlsConf.CipherSuites = []uint16{
+		TLS1_CK_RSA_WITH_AES_128_GCM_SHA256,
+		TLS1_CK_RSA_WITH_AES_128_SHA256,
+		TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256,
+		TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256,
+	}
 	switch mode := o["sslmode"]; mode {
 	// "require" is the default.
 	case "", "require":
