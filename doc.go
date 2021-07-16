@@ -24,22 +24,19 @@ using this package directly. For example:
 
 Logging
 
-nzgo defines a simple logger interface. Set LogLevel to control logging verbosity and LogPath to specify log file path.
-In order to enable logging for the driver, you need to write below code in your application
+nzgo defines a simple logger interface. Set logLevel to control logging verbosity and logPath to specify log file path.
+By default logging will be enabled with logLevel=Info and current directory as logPath.
 
-    var elog nzgo.NZLogger
-    elog.LogLevel = "off"
-    elog.LogPath = "C:\\Logs\\"
-    elog.Initialize()
+You can configure logLevel and logPath (i.e. log file directory) as per your requirement.
 
-Declaring elog variable and calling elog.Initialize() function is mandatory else application would fail with error "runtime error: invalid memory address or nil pointer dereference".
+There is one more configuration parameter with logger "additionalLogFile". This parameter can be used to set additional logger file.
+additionalLogFile can be used to enable writing logs to stdout, this can be achieved by simply setting
+"additionalLogFile=stdout"
 
-You can configure LogLevel and LogPath (i.e. log file directory) as per your requirement.
+Valid values for 'logLevel' are : "OFF" , "DEBUG", "INFO" and "FATAL".
+logLevel=OFF can be used to turn off logging. It will turn of both internal and additionalLogFile logs.
 
-You may skip initializing LogLevel and LogPath values. In such case, it would take default values. Default value for LogLevel is DEBUG
-while for LogPath is same directory as your application.
-
-Other valid values for 'LogLevel' are : "OFF" , "DEBUG", "INFO" and "FATAL"
+These logger configuration parameters should be mentinoed in connection string.
 
 SecurityLevel
 
@@ -73,7 +70,7 @@ Use Open to create a database handle with connection parameters:
 
 The Go Netezza Driver supports the following connection syntaxes (or data source name formats):
 
- "host=localhost user=admin dbname=db1 port=5480 password=password sslmode=require sslrootcert=C:/Users/root31.crt securityLevel=3"
+ "host=localhost user=admin dbname=db1 port=5480 password=password sslmode=require sslrootcert=C:/Users/root31.crt securityLevel=3 logLevel=Info logPath=./ additionalLogFile=stdout"
 
 In this case, application is running from NPS server itself so using 'localhost'.
 Golang driver should connect on port 5480(postgres port). The user is admin,
@@ -100,6 +97,9 @@ The following special connection parameters are supported:
 	* sslkey - Key file location. The file must contain PEM encoded data.
 	* sslrootcert - The location of the root certificate file. The file
 	  must contain PEM encoded data.
+	* logLevel - Log Level[Info/Debug/Fatal/Off]
+	* logPath - Path to write log files
+	* additionalLogPath - Additional log file can be mentioned here or stdout
 
 Valid values for sslmode are:
 

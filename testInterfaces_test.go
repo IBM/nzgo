@@ -19,18 +19,17 @@ const (
 		"dbname= " +
 		"host= " +
 		"securityLevel= " +
-		"sslmode= "
+		"sslmode= " +
+		"logLevel= " +
+		"logPath= " +
+	 	"additionalLogFile= "
 )
 
 func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
-	elog := NZLogger{"DEBUG", ""}
-	elog.Initialize()
 	return sql.Open("nzgo", conninfostr)
 }
 
 func TestNewConnector_WorksWithOpenDB(t *testing.T) {
-	elog := NZLogger{"DEBUG", ""}
-	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -49,8 +48,6 @@ func TestNewConnector_WorksWithOpenDB(t *testing.T) {
 
 func TestNewConnector_Connect(t *testing.T) {
 	fmt.Println("Interface Function check : Connect()")
-	elog := NZLogger{"DEBUG", ""}
-	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
@@ -72,8 +69,6 @@ func TestNewConnector_Connect(t *testing.T) {
 
 func TestNewConnector_Driver(t *testing.T) {
 	fmt.Println("Interface Function check : Driver()")
-	elog := NZLogger{"DEBUG", ""}
-	elog.Initialize()
 	name := conninfo
 	c, err := NewConnector(name)
 	if err != nil {
