@@ -1,3 +1,3 @@
-module github.com/IBM/nzgo@v0.11.2.0
+module github.com/IBM/nzgo
 
 go 1.14
