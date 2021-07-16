@@ -2967,15 +2967,15 @@ func (cn *conn) Conn_processAuthResponse() bool {
 
 		case 'N':
 			cn.recv_n_bytes(4) // ignore first 4 bytes
-                        x, _ := cn.recv_n_bytes(4)
-   		        len := x.int32()
-                        elog.Debugf(chopPath(funName()), "Backend message(Notice) length %d\n", len)
+			x, _ := cn.recv_n_bytes(4)
+			len := x.int32()
+			elog.Debugf(chopPath(funName()), "Backend message(Notice) length %d\n", len)
 
-                        responseBuf, _ := cn.recv_n_bytes(len)
-                        notice := &rows{cn: cn}
-                        notice.noticetag = responseBuf.string()
-                        elog.Infof(chopPath(funName()), "Message(Notice) received %s\n", notice.noticetag)
-		
+			responseBuf, _ := cn.recv_n_bytes(len)
+			notice := &rows{cn: cn}
+			notice.noticetag = responseBuf.string()
+			elog.Infof(chopPath(funName()), "Message(Notice) received %s\n", notice.noticetag)
+
 		default:
 			elog.Fatalf(chopPath(funName()), "Unexpected response: %q", t)
 			res = false
