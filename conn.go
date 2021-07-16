@@ -2937,7 +2937,7 @@ func (cn *conn) Conn_processAuthResponse() bool {
 	for flg != true {
 		t, _ := cn.recvSingleByte()
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", t)
-		if t != 'R' {
+		if t != 'R' && t != 'N' {
 			cn.recv_n_bytes(8) // do not use this just ignore
 		}
 		switch t {
@@ -2964,6 +2964,18 @@ func (cn *conn) Conn_processAuthResponse() bool {
 			elog.Fatalf(chopPath(funName()), "Error occured, server response : %q", t)
 			res = false
 			flg = true
+
+		case 'N':
+			cn.recv_n_bytes(4) // ignore first 4 bytes
+                        x, _ := cn.recv_n_bytes(4)
+   		        len := x.int32()
+                        elog.Debugf(chopPath(funName()), "Backend message(Notice) length %d\n", len)
+
+                        responseBuf, _ := cn.recv_n_bytes(len)
+                        notice := &rows{cn: cn}
+                        notice.noticetag = responseBuf.string()
+                        elog.Infof(chopPath(funName()), "Message(Notice) received %s\n", notice.noticetag)
+		
 		default:
 			elog.Fatalf(chopPath(funName()), "Unexpected response: %q", t)
 			res = false
