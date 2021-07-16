@@ -147,8 +147,8 @@ func (elog NZLogger) Debugln(args ...interface{}) {
 }
 
 /* Info logger adds messages for client */
-func (elog NZLogger) infof(s string, args ...interface{}) {
-	prefixStr := prefixString() + "[INFO] : "
+func (elog NZLogger) Infof(fname string, s string, args ...interface{}) {
+	prefixStr := prefixString() + "[INFO] " + fname + " "
 	Info.SetFlags(0)
 	Info.SetPrefix(prefixStr)
 
@@ -156,7 +156,7 @@ func (elog NZLogger) infof(s string, args ...interface{}) {
 }
 
 func (elog NZLogger) Infoln(args ...interface{}) {
-	prefixStr := prefixString() + "[INFO] : "
+	prefixStr := prefixString() + "[INFO] "
 	Info.SetFlags(0)
 	Info.SetPrefix(prefixStr)
 
