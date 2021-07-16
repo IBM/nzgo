@@ -11,7 +11,7 @@ using this package directly. For example:
 	)
 
 	func main() {
-		connStr := "user=nz dbname=db1 sslmode=verify-full"
+		connStr := "user=nz dbname=db1 sslmode=verify-full "
 		db, err := sql.Open("nzgo", connStr)
 		if err != nil {
 			log.Fatal(err)
