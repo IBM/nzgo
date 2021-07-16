@@ -79,7 +79,11 @@ func (elog NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 	}
 	var additionalFh *os.File
 	if elog.AdditionalLogFile != "" {
-		additionalFh, err = os.OpenFile(elog.AdditionalLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if strings.ToUpper(elog.AdditionalLogFile) == "STDOUT" {
+			additionalFh = os.Stdout
+		} else {
+			additionalFh, err = os.OpenFile(elog.AdditionalLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		}
 		if err != nil {
 			errorf("Error opening logger file")
 		}
