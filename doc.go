@@ -7,7 +7,7 @@ using this package directly. For example:
 	import (
 		"database/sql"
 
-		_ "github.com/IBM/nzgo"
+		_ "github.com/IBM/nzgo/v12"
 	)
 
 	func main() {
