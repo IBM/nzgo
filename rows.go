@@ -1,14 +1,13 @@
 package nzgo
 
 import (
-	"math"
 	"reflect"
 	"time"
 
 	"github.com/IBM/nzgo/oid"
 )
 
-const headerSize = 4
+const headerSize = 16
 
 type fieldDesc struct {
 	// The object ID of the data type.
@@ -49,9 +48,11 @@ func (fd fieldDesc) Name() string {
 func (fd fieldDesc) Length() (length int64, ok bool) {
 	switch fd.OID {
 	case oid.T_text, oid.T_bytea:
-		return math.MaxInt64, true
-	case oid.T_varchar, oid.T_bpchar:
+		return 4096, true
+	case oid.T_varchar, oid.T_bpchar, oid.T_nvarchar, oid.T_nchar:
 		return int64(fd.Mod - headerSize), true
+	case oid.T_name:
+		return 256, true
 	default:
 		return 0, false
 	}
