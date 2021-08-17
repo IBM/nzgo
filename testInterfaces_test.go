@@ -5,7 +5,7 @@ package nzgo
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
+//	"database/sql/driver"
 	"fmt"
 	"runtime/debug"
 	"strings"
@@ -29,6 +29,7 @@ func openTestConnConninfo(conninfostr string) (*sql.DB, error) {
 	return sql.Open("nzgo", conninfostr)
 }
 
+/*
 func TestNewConnector_WorksWithOpenDB(t *testing.T) {
 	name := conninfo
 	c, err := NewConnector(name)
@@ -87,6 +88,7 @@ func TestNewConnector_Driver(t *testing.T) {
 	}
 	txn.Rollback()
 }
+*/
 
 func TestRows_Next(t *testing.T) {
 	fmt.Println("Interface Function check : rows->Next()")
