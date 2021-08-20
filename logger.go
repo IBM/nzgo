@@ -24,7 +24,7 @@ type NZLogger struct {
 	AdditionalLogFile string
 }
 
-var elog NZLogger
+var elog *NZLogger = &NZLogger{}
 
 /* Create logger handler with some predefined prefix setting,
  * this will be overwritten in actual logging.
@@ -46,7 +46,7 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
+func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 	elog.LogLevel = logLevel
 	elog.LogPath = logPath
 	elog.AdditionalLogFile = additionalLogFile
