@@ -46,7 +46,7 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
+func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) (err error) {
 	elog.LogLevel = logLevel
 	elog.LogPath = logPath
 	elog.AdditionalLogFile = additionalLogFile
@@ -75,7 +75,7 @@ func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 	/* Open file with permissions USER:read and write; GROUP&OTHERS:read */
 	fh, err := os.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		errorf("Error opening logger file")
+		return err
 	}
 	var additionalFh *os.File
 	if elog.AdditionalLogFile != "" {
@@ -85,7 +85,7 @@ func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 			additionalFh, err = os.OpenFile(elog.AdditionalLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		}
 		if err != nil {
-			errorf("Error opening logger file")
+			return err
 		}
 	}
 
@@ -112,7 +112,7 @@ func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 
 		// case default : //It will do nothing to discard the log output but log file with banner will be generated
 	}
-
+	return nil
 }
 
 /* Used to write banner for logger. ToDo:Add more info related to server */
