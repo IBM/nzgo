@@ -1168,7 +1168,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 	for {
 		response, err := cn.recvSingleByte()
 		if err != nil {
-			panic(err)
+			elog.Infoln(chopPath(funName()), "Error: ", err)
+			return nil, err
 		}
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", response)
 		cn.recv_n_bytes(4)
@@ -1230,7 +1231,10 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			break
 		case 'x': /* handle Ext Tbl parser abort */
 			cn.recv_n_bytes(4)
-			elog.Fatalf(chopPath(funName()), "Error operation cancel")
+			errorString := fmt.Sprintf("Error operation cancel")
+			err = errors.New(errorString)
+			elog.Infoln(chopPath(funName()), errorString)
+			return nil, err
 			break
 		case 'e':
 			length, _ := cn.recv_n_bytes(4)
@@ -1248,7 +1252,10 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			break
 		default:
 			cn.bad = true
-			elog.Fatalf(chopPath(funName()), "Unexpected response: %q", response)
+			errorString := fmt.Sprintf("Unexpected response: %q", response)
+			err = errors.New(errorString)
+			elog.Infoln(chopPath(funName()), errorString)
+			return nil, err
 			break
 		}
 
@@ -1291,7 +1298,8 @@ func (cn *conn) simpleQuery(query string) (res *rows, err error) {
 
 	_, err = cn.c.Write(buffer.buf)
 	if err != nil {
-		panic(err)
+		elog.Infoln(chopPath(funName()), "Error: ", err)
+		return nil, err
 	}
 
 	cn.status = CONN_EXECUTING
