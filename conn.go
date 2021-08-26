@@ -310,10 +310,12 @@ func (s transactionStatus) String() string {
 	case txnStatusInFailedTransaction:
 		return "in a failed transaction"
 	default:
-		errorf("unknown transactionStatus %d", s)
+		msg := fmt.Sprintf("unknown transactionStatus %d", s)
+		return msg
 	}
-
-	panic("not reached")
+	msg := "not reached"
+	elog.Debugln(msg)
+	return msg
 }
 
 // Dialer is the dialer interface. It can be used to obtain more control over
@@ -884,7 +886,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 
 	_, err = cn.c.Write(buffer.buf)
 	if err != nil {
-		panic(err)
+		elog.Infoln(chopPath(funName()), "Error: ", err)
+		return emptyRows, commandTag, err
 	}
 
 	cn.status = CONN_EXECUTING
@@ -892,7 +895,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 	for {
 		response, err := cn.recvSingleByte()
 		if err != nil {
-			panic(err)
+			elog.Infoln(chopPath(funName()), "Error: ", err)
+			return emptyRows, commandTag, err
 		}
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", response)
 		cn.recv_n_bytes(4)
@@ -923,7 +927,10 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			break
 		case 'x': /* handle Ext Tbl parser abort */
 			cn.recv_n_bytes(4)
-			elog.Fatalf(chopPath(funName()), "Error operation cancel")
+			errorString := fmt.Sprintf("Error operation cancel")
+			err = errors.New(errorString)
+			elog.Infoln(chopPath(funName()), errorString)
+			return emptyRows, commandTag, err
 			break
 		case 'e':
 			length, _ := cn.recv_n_bytes(4)
@@ -952,7 +959,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			fh, err = os.OpenFile(fname.string(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 			if err != nil { // file open failed
 				// Report error to the client
-				elog.Fatalf(chopPath(funName()), "Error opening file: %q", err)
+				elog.Infoln(chopPath(funName()), "Error: ", err)
+				return emptyRows, commandTag, err
 			} else {
 				// file open successfully, send status back to datawriter
 				elog.Debugln(chopPath(funName()), "Successfully opened file: ", fh.Name())
@@ -963,7 +971,10 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			cn.receiveAndWriteDatatoExternal(fname, fh)
 		default:
 			cn.bad = true
-			elog.Fatalf(chopPath(funName()), "Unknown response for simple exec: %q", response)
+			errorString := fmt.Sprintf("Unknown response for simple exec: %q", response)
+			err = errors.New(errorString)
+			elog.Infoln(chopPath(funName()), errorString)
+			return emptyRows, commandTag, err
 		}
 	}
 }
