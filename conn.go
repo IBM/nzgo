@@ -1490,11 +1490,23 @@ func (cn *conn) query(query string, args []driver.Value) (_ *rows, err error) {
 	if cn.binaryParameters {
 		cn.sendBinaryModeQuery(query, args)
 
-		cn.readParseResponse()
-		cn.readBindResponse()
+		err := cn.readParseResponse()
+		if err != nil {
+			return nil, err
+		}
+		err = cn.readBindResponse()
+		if err != nil {
+			return nil, err
+		}
 		rows := &rows{cn: cn}
-		rows.rowsHeader = cn.readPortalDescribeResponse()
-		cn.postExecuteWorkaround()
+		rows.rowsHeader, err = cn.readPortalDescribeResponse()
+		if err != nil {
+			return nil, err
+		}
+		err = cn.postExecuteWorkaround()
+		if err != nil {
+			return nil, err
+		}
 		return rows, nil
 	}
 	st, err := cn.prepareTo(query, "")
@@ -1525,10 +1537,22 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 	if cn.binaryParameters {
 		cn.sendBinaryModeQuery(query, args)
 
-		cn.readParseResponse()
-		cn.readBindResponse()
-		cn.readPortalDescribeResponse()
-		cn.postExecuteWorkaround()
+		err := cn.readParseResponse()
+		if err != nil {
+			return nil, err
+		}
+		err = cn.readBindResponse()
+		if err != nil {
+			return nil, err
+		}
+		_, err = cn.readPortalDescribeResponse()
+		if err != nil {
+			return nil, err
+		}
+		err = cn.postExecuteWorkaround()
+		if err != nil {
+			return nil, err
+		}
 		res, _, err = cn.readExecuteResponse("Execute")
 		return res, err
 	}
@@ -1643,7 +1667,7 @@ func (cn *conn) recv1Buf(r *readBuf) byte {
 	for {
 		t, err := cn.recvMessage(r)
 		if err != nil {
-			panic(err)
+			elog.Debugln(chopPath(funName()), "Error while receiving message : ", err)
 		}
 
 		switch t {
@@ -3922,22 +3946,22 @@ func (cn *conn) processBackendKeyData(r *readBuf) {
 	cn.secretKey = r.int32()
 }
 
-func (cn *conn) readParseResponse() {
+func (cn *conn) readParseResponse() error {
 	t, r := cn.recv1()
 	switch t {
 	case '1':
-		return
+		return nil
 	case 'E':
 		err := parseError(r)
 		cn.readReadyForQuery()
-		panic(err)
+		return err
 	default:
 		cn.bad = true
-		errorf("unexpected Parse response %q", t)
+		return fmt.Errorf("unexpected Parse response %q", t)
 	}
 }
 
-func (cn *conn) readStatementDescribeResponse() (paramTyps []oid.Oid, colNames []string, colTyps []fieldDesc) {
+func (cn *conn) readStatementDescribeResponse() (paramTyps []oid.Oid, colNames []string, colTyps []fieldDesc, err error) {
 	for {
 		t, r := cn.recv1()
 		switch t {
@@ -3948,55 +3972,54 @@ func (cn *conn) readStatementDescribeResponse() (paramTyps []oid.Oid, colNames [
 				paramTyps[i] = r.oid()
 			}
 		case 'n':
-			return paramTyps, nil, nil
+			return paramTyps, nil, nil, nil
 		case 'T':
 			colNames, colTyps = parseStatementRowDescribe(r)
-			return paramTyps, colNames, colTyps
+			return paramTyps, colNames, colTyps, nil
 		case 'E':
 			err := parseError(r)
 			cn.readReadyForQuery()
-			panic(err)
+			return nil, nil, nil, err
 		default:
 			cn.bad = true
-			errorf("unexpected Describe statement response %q", t)
+			return nil, nil, nil, fmt.Errorf("unexpected Describe statement response %q", t)
 		}
 	}
 }
 
-func (cn *conn) readPortalDescribeResponse() rowsHeader {
+func (cn *conn) readPortalDescribeResponse() (rowsHeader, error) {
 	t, r := cn.recv1()
 	switch t {
 	case 'T':
-		return parsePortalRowDescribe(r)
+		return parsePortalRowDescribe(r), nil
 	case 'n':
-		return rowsHeader{}
+		return rowsHeader{}, nil
 	case 'E':
 		err := parseError(r)
 		cn.readReadyForQuery()
-		panic(err)
+		return rowsHeader{}, err
 	default:
 		cn.bad = true
-		errorf("unexpected Describe response %q", t)
+		return rowsHeader{}, fmt.Errorf("unexpected Describe response %q", t)
 	}
-	panic("not reached")
 }
 
-func (cn *conn) readBindResponse() {
+func (cn *conn) readBindResponse() error {
 	t, r := cn.recv1()
 	switch t {
 	case '2':
-		return
+		return nil
 	case 'E':
 		err := parseError(r)
 		cn.readReadyForQuery()
-		panic(err)
+		return err
 	default:
 		cn.bad = true
-		errorf("unexpected Bind response %q", t)
+		return fmt.Errorf("unexpected Bind response %q", t)
 	}
 }
 
-func (cn *conn) postExecuteWorkaround() {
+func (cn *conn) postExecuteWorkaround() error {
 	// Work around a bug in sql.DB.QueryRow: in Go 1.2 and earlier it ignores
 	// any errors from rows.Next, which masks errors that happened during the
 	// execution of the query.  To avoid the problem in common cases, we wait
@@ -4013,14 +4036,14 @@ func (cn *conn) postExecuteWorkaround() {
 		case 'E':
 			err := parseError(r)
 			cn.readReadyForQuery()
-			panic(err)
+			return err
 		case 'C', 'D', 'I':
 			// the query didn't fail, but we can't process this message
 			cn.saveMessage(t, r)
-			return
+			return nil
 		default:
 			cn.bad = true
-			errorf("unexpected message during extended query execution: %q", t)
+			return fmt.Errorf("unexpected message during extended query execution: %q", t)
 		}
 	}
 }
@@ -4115,12 +4138,12 @@ func parseEnviron(env []string) (out map[string]string) {
 			out[keyname] = parts[1]
 		}
 		unsupported := func() {
-			panic(fmt.Sprintf("setting %v not supported", parts[0]))
+			elog.Infof(chopPath(funName()), "setting %v not supported", parts[0])
 		}
 
 		// The order of these is the same as is seen in the
 		// PostgreSQL 9.1 manual. Unsupported but well-defined
-		// keys cause a panic; these should be unset prior to
+		// keys logged as error; these should be unset prior to
 		// execution. Options which pq expects to be set to a
 		// certain value are allowed, but must be set to that
 		// value if present (they can, of course, be absent).
