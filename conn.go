@@ -1970,7 +1970,7 @@ func (cn *conn) Conn_send_query() error {
 	return err
 }
 
-func (rs *rows) readTuplesForCatalogueQuery(dest []driver.Value) byte {
+func (rs *rows) readTuplesForCatalogueQuery(dest []driver.Value) (b byte, err error) {
 
 	conn := rs.cn
 	response := conn.recv1Buf(&rs.rb)
@@ -1980,13 +1980,16 @@ func (rs *rows) readTuplesForCatalogueQuery(dest []driver.Value) byte {
 		for i := range dest {
 			length := rs.rb.int32()
 			length = length - 4
-			dest[i] = decode(&conn.parameterStatus, rs.rb.next(length), rs.colTyps[i].OID, rs.colFmts[i])
+			dest[i], err = decode(&conn.parameterStatus, rs.rb.next(length), rs.colTyps[i].OID, rs.colFmts[i])
+			if err != nil {
+				return response, err
+			}
 			elog.Debugln(chopPath(funName()), rs.rowsHeader.colNames[i], ":", dest[i])
 		}
 		response = rs.rb.byte()
-		return response
+		return response, nil
 	default:
-		return response
+		return response, nil
 	}
 }
 
@@ -2023,7 +2026,10 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 			responseBuf, _ := cn.recv_n_bytes(int(length))
 			elog.Debugln(chopPath(funName()), "Reading message from backend ", responseBuf)
 			cn.saveMessage(response, &responseBuf)
-			response = res.readTuplesForCatalogueQuery(dest)
+			response, err = res.readTuplesForCatalogueQuery(dest)
+			if err != nil {
+				return err
+			}
 			// for processing result set which return multiple rows
 			for response == 68 {
 				cn.recv_n_bytes(7)
@@ -2032,7 +2038,10 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 				responseBuf, _ := cn.recv_n_bytes(int(length))
 				elog.Debugln(chopPath(funName()), "Reading message from backend ", responseBuf)
 				cn.saveMessage(response, &responseBuf)
-				response = res.readTuplesForCatalogueQuery(dest)
+				response, err = res.readTuplesForCatalogueQuery(dest)
+				if err != nil {
+					return err
+				}
 			}
 			continue
 		default:
@@ -2056,7 +2065,7 @@ func convertDecimalToBinary(number byte) []byte {
 	return binary
 }
 
-func (rs *rows) readTuples(dest []driver.Value) {
+func (rs *rows) readTuples(dest []driver.Value) (err error) {
 
 	var bitmap []byte
 	conn := rs.cn
@@ -2079,11 +2088,15 @@ func (rs *rows) readTuples(dest []driver.Value) {
 			} else {
 				length := rs.rb.int32()
 				length = length - 4
-				dest[i] = decode(&conn.parameterStatus, rs.rb.next(length), rs.colTyps[i].OID, rs.colFmts[i])
+				dest[i], err = decode(&conn.parameterStatus, rs.rb.next(length), rs.colTyps[i].OID, rs.colFmts[i])
+				if err != nil {
+					return err
+				}
 			}
 			elog.Debugln(chopPath(funName()), rs.rowsHeader.colNames[i], ":", dest[i])
 		}
 	}
+	return nil
 }
 
 func (res *rows) Next(dest []driver.Value) (err error) {
@@ -2129,7 +2142,10 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
 			elog.Debugln(chopPath(funName()), "Reading message from backend ", responseBuf)
 			cn.saveMessage(response, &responseBuf)
-			res.readTuples(dest)
+			err = res.readTuples(dest)
+			if err != nil {
+				return err
+			}
 			return
 		case 'E':
 			cn.recv_n_bytes(4)

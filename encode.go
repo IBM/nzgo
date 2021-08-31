@@ -49,57 +49,57 @@ func encode(parameterStatus *parameterStatus, x interface{}, pgtypOid oid.Oid) [
 		return formatTs(v)
 
 	default:
-		errorf("encode: unknown type for %T", v)
+		elog.Infoln(chopPath(funName()), "encode: unknown type for %T", v)
 	}
-
-	panic("not reached")
+	return nil
 }
 
-func decode(parameterStatus *parameterStatus, s []byte, typ oid.Oid, f format) interface{} {
+func decode(parameterStatus *parameterStatus, s []byte, typ oid.Oid, f format) (interface{}, error) {
 	switch f {
 	case formatBinary:
 		return binaryDecode(parameterStatus, s, typ)
 	case formatText:
 		return textDecode(parameterStatus, s, typ)
 	default:
-		panic("not reached")
+		elog.Infoln("not reached")
 	}
+	return nil, nil
 }
 
-func binaryDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interface{} {
+func binaryDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) (interface{}, error) {
 	switch typ {
 	case oid.T_bytea:
-		return s
+		return s, nil
 	case oid.T_int8:
-		return int64(binary.BigEndian.Uint64(s))
+		return int64(binary.BigEndian.Uint64(s)), nil
 	case oid.T_int4:
-		return int64(int32(binary.BigEndian.Uint32(s)))
+		return int64(int32(binary.BigEndian.Uint32(s))), nil
 	case oid.T_int2:
-		return int64(int16(binary.BigEndian.Uint16(s)))
+		return int64(int16(binary.BigEndian.Uint16(s))), nil
 	case oid.T_varbinary:
 		b, err := decodeUUIDBinary(s)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		return b
+		return b, nil
 
 	default:
-		errorf("don't know how to decode binary parameter of type %d", uint32(typ))
+		return nil, fmt.Errorf("don't know how to decode binary parameter of type %d", uint32(typ))
 	}
 
-	panic("not reached")
+	return nil, nil
 }
 
-func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interface{} {
+func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) (interface{}, error) {
 	switch typ {
 	case oid.T_char, oid.T_bpchar, oid.T_varchar, oid.T_nvarchar, oid.T_text, oid.T_name, oid.T_oid, oid.T_json, oid.T_jsonb, oid.T_jsonpath:
-		return string(s)
+		return string(s), nil
 	case oid.T_bytea:
 		b, err := parseBytea(s)
 		if err != nil {
-			errorf("%s", err)
+			return nil, fmt.Errorf("%s", err)
 		}
-		return b
+		return b, nil
 
 	case oid.T_timestamp, oid.T_date, oid.T_abstime:
 		return parseTs(nil, string(s))
@@ -108,13 +108,13 @@ func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interfa
 	case oid.T_timetz:
 		return mustParse("15:04:05-07", typ, s)
 	case oid.T_bool:
-		return s[0] == 't'
+		return s[0] == 't', nil
 	case oid.T_int8, oid.T_int4, oid.T_int2:
 		i, err := strconv.ParseInt(string(s), 10, 64)
 		if err != nil {
-			errorf("%s", err)
+			return nil, fmt.Errorf("%s", err)
 		}
-		return i
+		return i, nil
 	case oid.T_float4, oid.T_float8:
 		bits := 64
 		if typ == oid.T_float4 {
@@ -122,12 +122,12 @@ func textDecode(parameterStatus *parameterStatus, s []byte, typ oid.Oid) interfa
 		}
 		f, err := strconv.ParseFloat(string(s), bits)
 		if err != nil {
-			errorf("%s", err)
+			return nil, fmt.Errorf("%s", err)
 		}
-		return f
+		return f, nil
 	}
 
-	return s
+	return s, nil
 }
 
 // appendEncodedText encodes item in text format as required by COPY
@@ -150,10 +150,9 @@ func appendEncodedText(parameterStatus *parameterStatus, buf []byte, x interface
 	case nil:
 		return append(buf, "\\N"...)
 	default:
-		errorf("encode: unknown type for %T", v)
+		elog.Infof(chopPath(funName()), "encode: unknown type for %T", v)
 	}
-
-	panic("not reached")
+	return nil
 }
 
 func appendEscapedText(buf []byte, text string) []byte {
@@ -194,7 +193,7 @@ func appendEscapedText(buf []byte, text string) []byte {
 	return result
 }
 
-func mustParse(f string, typ oid.Oid, s []byte) time.Time {
+func mustParse(f string, typ oid.Oid, s []byte) (time.Time, error) {
 	str := string(s)
 
 	// check for a 30-minute-offset timezone
@@ -204,9 +203,9 @@ func mustParse(f string, typ oid.Oid, s []byte) time.Time {
 	}
 	t, err := time.Parse(f, str)
 	if err != nil {
-		errorf("decode: %s", err)
+		return t, fmt.Errorf("decode: %s", err)
 	}
-	return t
+	return t, nil
 }
 
 var errInvalidTimestamp = errors.New("invalid timestamp")
@@ -329,24 +328,24 @@ func disableInfinityTs() {
 // setting ("ISO, MDY"), the only one we currently support. This
 // accounts for the discrepancies between the parsing available with
 // time.Parse and the Postgres date formatting quirks.
-func parseTs(currentLocation *time.Location, str string) interface{} {
+func parseTs(currentLocation *time.Location, str string) (interface{}, error) {
 	switch str {
 	case "-infinity":
 		if infinityTsEnabled {
-			return infinityTsNegative
+			return infinityTsNegative, nil
 		}
-		return []byte(str)
+		return []byte(str), nil
 	case "infinity":
 		if infinityTsEnabled {
-			return infinityTsPositive
+			return infinityTsPositive, nil
 		}
-		return []byte(str)
+		return []byte(str), nil
 	}
 	t, err := ParseTimestamp(currentLocation, str)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return t
+	return t, nil
 }
 
 // ParseTimestamp parses Postgres' text format. It returns a time.Time in

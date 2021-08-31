@@ -120,7 +120,7 @@ func (l *ListenerConn) setState(newState int32) bool {
 	case connStateExpectReadyForQuery:
 		expectedState = connStateExpectResponse
 	default:
-		panic(fmt.Sprintf("unexpected listenerConnState %d", newState))
+		elog.Infoln(chopPath(funName()), "Error: ", fmt.Sprintf("unexpected listenerConnState %d", newState))
 	}
 
 	return atomic.CompareAndSwapInt32(&l.connState, expectedState, newState)
@@ -238,7 +238,7 @@ func (l *ListenerConn) Ping() error {
 	}
 	if err != nil {
 		// shouldn't happen
-		panic(err)
+		return err
 	}
 	return nil
 }
@@ -252,7 +252,7 @@ func (l *ListenerConn) sendSimpleQuery(q string) (err error) {
 
 	// must set connection state before sending the query
 	if !l.setState(connStateExpectResponse) {
-		panic("two queries running at the same time")
+		return fmt.Errorf("two queries running at the same time")
 	}
 
 	// Can't use l.cn.writeBuf here because it uses the scratch buffer which
@@ -314,7 +314,7 @@ func (l *ListenerConn) ExecSimpleQuery(q string) (executed bool, err error) {
 		case 'Z':
 			// sanity check
 			if m.err != nil {
-				panic("m.err != nil")
+				return false, fmt.Errorf("m.err == nil")
 			}
 			// done; err might or might not be set
 			return true, err
@@ -322,7 +322,7 @@ func (l *ListenerConn) ExecSimpleQuery(q string) (executed bool, err error) {
 		case 'E':
 			// sanity check
 			if m.err == nil {
-				panic("m.err == nil")
+				return false, fmt.Errorf("m.err == nil")
 			}
 			// server responded with an error; ReadyForQuery to follow
 			err = m.err
@@ -621,10 +621,10 @@ func (l *Listener) disconnectCleanup() error {
 	select {
 	case _, ok := <-l.connNotificationChan:
 		if ok {
-			panic("connNotificationChan not closed")
+			return fmt.Errorf("connNotificationChan not closed")
 		}
 	default:
-		panic("connNotificationChan not closed")
+		return fmt.Errorf("connNotificationChan not closed")
 	}
 
 	err := l.cn.Err()
