@@ -1372,7 +1372,7 @@ func decideColumnFormats(colTyps []fieldDesc, forceText bool) (colFmts []format,
 	}
 }
 
-func (cn *conn) prepareTo(query, stmtName string) *stmt {
+func (cn *conn) prepareTo(query, stmtName string) (*stmt, error) {
 
 	query = strings.ToLower(query)
 	st := &stmt{cn: cn, name: stmtName, query: query}
@@ -1387,7 +1387,7 @@ func (cn *conn) prepareTo(query, stmtName string) *stmt {
 
 	index := strings.Index(query, "select")
 	if index != 0 {
-		return st
+		return st, nil
 	}
 
 	cn.Sock_clear_socket()
@@ -1399,13 +1399,13 @@ func (cn *conn) prepareTo(query, stmtName string) *stmt {
 	buffer.string(query + " ANALYZE ")
 	_, err := cn.c.Write(buffer.buf)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	for {
 		response, err := cn.recvSingleByte()
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", response)
 		cn.recv_n_bytes(4)
@@ -1420,19 +1420,20 @@ func (cn *conn) prepareTo(query, stmtName string) *stmt {
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
 			st.rowsHeader = parsePortalRowDescribe(&responseBuf)
-			return st
+			return st, nil
 		case 'E':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
-			elog.Fatalln(funName(), responseBuf.string())
-			return st
+			//elog.Fatalln(funName(), responseBuf.string())
+			return st, fmt.Errorf(responseBuf.string())
 		default:
 			cn.bad = true
-			elog.Fatalf(chopPath(funName()), "Unexpected response for analyze query: %q", response)
+			//elog.Fatalf(chopPath(funName()), "Unexpected response for analyze query: %q", response)
+			return nil, fmt.Errorf("Unexpected response for analyze query: %q", response)
 			break
 		}
 	}
-	return st
+	return st, nil
 }
 
 func (cn *conn) Prepare(q string) (_ driver.Stmt, err error) {
@@ -1447,7 +1448,7 @@ func (cn *conn) Prepare(q string) (_ driver.Stmt, err error) {
 		}
 		return s, err
 	}
-	return cn.prepareTo(q, cn.gname()), nil
+	return cn.prepareTo(q, cn.gname())
 }
 
 func (cn *conn) Close() (err error) {
@@ -1496,7 +1497,10 @@ func (cn *conn) query(query string, args []driver.Value) (_ *rows, err error) {
 		cn.postExecuteWorkaround()
 		return rows, nil
 	}
-	st := cn.prepareTo(query, "")
+	st, err := cn.prepareTo(query, "")
+	if err != nil {
+		return nil, err
+	}
 	st.Query(args)
 	return &rows{
 		cn:         cn,
@@ -1531,11 +1535,11 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 	// Use the unnamed statement to defer planning until bind
 	// time, or else value-based selectivity estimates cannot be
 	// used.
-	st := cn.prepareTo(query, "")
-	r, err := st.Exec(args)
+	st, err := cn.prepareTo(query, "")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
+	r, err := st.Exec(args)
 	return r, err
 }
 
@@ -1610,25 +1614,25 @@ func (cn *conn) recvMessage(r *readBuf) (byte, error) {
 }
 
 // recv receives a message from the backend, but if an error happened while
-// reading the message or the received message was an ErrorResponse, it panics.
+// reading the message or the received message was an ErrorResponse, it will return error
 // NoticeResponses are ignored.  This function should generally be used only
 // during the startup sequence.
-func (cn *conn) recv() (t byte, r *readBuf) {
+func (cn *conn) recv() (t byte, r *readBuf, err error) {
 	for {
 		var err error
 		r = &readBuf{}
 		t, err = cn.recvMessage(r)
 		if err != nil {
-			panic(err)
+			return t, r, err
 		}
 
 		switch t {
 		case 'E':
-			panic(parseError(r))
+			return t, r, parseError(r)
 		case 'N':
 			// ignore
 		default:
-			return
+			return t, r, nil
 		}
 	}
 }
@@ -1723,10 +1727,10 @@ func (cn *conn) recvSingleByte() (t byte, err error) {
 		data := make([]byte, 1)
 		nread, err := cn.c.Read(data[:])
 		if nread == 0 {
-			elog.Fatalf(chopPath(funName()), "Single Byte Read failed; 0 bytes read")
+			return data[0], fmt.Errorf("Single Byte Read failed; 0 bytes read")
 		}
 		if err != nil {
-			elog.Fatalln(chopPath(funName()), "Error reading single byte : ", err)
+			return data[0], fmt.Errorf("Error reading single byte : %s", err)
 		}
 		return data[0], nil
 	}
@@ -1739,7 +1743,8 @@ func (cn *conn) recv_n_bytes(n int) (r readBuf, err error) {
 		for totalRead < n {
 			nread, err := cn.c.Read(data[totalRead:]) // it reads max 1024bytes in one go. Which also has handhsake data. If large data read is getting processed this is very imp
 			if err != nil {
-				elog.Fatalln(chopPath(funName()), "Error reading n bytes : ", n, err)
+				elog.Debugln(chopPath(funName()), "Error reading n bytes : ", n, err)
+				return data, err
 			}
 			totalRead = totalRead + nread
 		}
@@ -1805,11 +1810,9 @@ func (cn *conn) startup(o values) (err error) {
 			/* We no longer support the old startup packet approach for
 			 * establishing connection
 			 */
-			elog.Fatalln(chopPath(funName()), "Bad attribute value error")
-			break
+			return fmt.Errorf("Bad attribute value error")
 		} else {
-			elog.Fatalln(chopPath(funName()), "Bad protocol error")
-			break
+			return fmt.Errorf("Bad protocol error")
 		}
 
 	}
@@ -1977,7 +1980,7 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 
 	response, err := cn.recvSingleByte()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for {
@@ -2009,7 +2012,7 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 			}
 			continue
 		default:
-			elog.Fatalf(chopPath(funName()), "Unknown response: %d", response)
+			return fmt.Errorf("Unknown response: %d", response)
 		}
 	}
 
@@ -2079,7 +2082,7 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 
 	response, err := cn.recvSingleByte()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for {
@@ -2135,7 +2138,7 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			return io.EOF
 
 		default:
-			elog.Fatalf(chopPath(funName()), "Unknown response: %d", response)
+			return fmt.Errorf("Unknown response: %d", response)
 		}
 	}
 
@@ -3493,7 +3496,7 @@ func (cn *conn) Conn_send_handshake_version4(o values) bool {
 	return true
 }
 
-func (cn *conn) auth(r *readBuf, o values) {
+func (cn *conn) auth(r *readBuf, o values) (err error) {
 
 	switch code := r.int32(); code {
 	case 0:
@@ -3503,13 +3506,17 @@ func (cn *conn) auth(r *readBuf, o values) {
 		w.string(o["password"])
 		cn.send(w)
 
-		t, r := cn.recv()
+		t, r, err := cn.recv()
+		if err != nil {
+			return err
+		}
+
 		if t != 'R' {
-			errorf("unexpected password response: %q", t)
+			return fmt.Errorf("unexpected password response: %q", t)
 		}
 
 		if r.int32() != 0 {
-			errorf("unexpected authentication response: %q", t)
+			return fmt.Errorf("unexpected authentication response: %q", t)
 		}
 	case 5:
 		s := string(r.next(4))
@@ -3517,17 +3524,22 @@ func (cn *conn) auth(r *readBuf, o values) {
 		w.string("md5" + md5s(md5s(o["password"]+o["user"])+s))
 		cn.send(w)
 
-		t, r := cn.recv()
+		t, r, err := cn.recv()
+		if err != nil {
+			return err
+		}
+
 		if t != 'R' {
-			errorf("unexpected password response: %q", t)
+			return fmt.Errorf("unexpected password response: %q", t)
 		}
 
 		if r.int32() != 0 {
-			errorf("unexpected authentication response: %q", t)
+			return fmt.Errorf("unexpected authentication response: %q", t)
 		}
 	default:
-		errorf("unknown authentication response: %d", code)
+		return fmt.Errorf("unknown authentication response: %d", code)
 	}
+	return nil
 }
 
 type format int
@@ -3591,10 +3603,10 @@ func (st *stmt) execQuery(arg []driver.Value) (r driver.Rows, err error) {
 	placeholder = "?"
 	query := st.query
 	if len(arg) >= 65536 {
-		errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
+		return nil, fmt.Errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
 	}
 	if len(arg) != len(st.paramTyps) {
-		errorf("got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
+		return nil, fmt.Errorf("got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
 	}
 	for i := 0; i < len(arg); i++ {
 
@@ -3612,7 +3624,7 @@ func (st *stmt) execQuery(arg []driver.Value) (r driver.Rows, err error) {
 			str := fmt.Sprintf("'%s'", arg[i])
 			query = strings.Replace(query, placeholder, str, 1)
 		default:
-			elog.Fatalln("unknown type of parameter")
+			return nil, fmt.Errorf("unknown type of parameter")
 		}
 	}
 	return st.cn.simpleQuery(query)
@@ -3624,10 +3636,10 @@ func (st *stmt) exec(arg []driver.Value) (res driver.Result, commandTag string, 
 	placeholder = "?"
 	query := st.query
 	if len(arg) >= 65536 {
-		errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
+		return nil, placeholder, fmt.Errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
 	}
 	if len(arg) != len(st.paramTyps) {
-		errorf("got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
+		return nil, placeholder, fmt.Errorf("got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
 	}
 	for i := 0; i < len(arg); i++ {
 
@@ -3645,7 +3657,7 @@ func (st *stmt) exec(arg []driver.Value) (res driver.Result, commandTag string, 
 			str := fmt.Sprintf("'%s'", arg[i])
 			query = strings.Replace(query, placeholder, str, 1)
 		default:
-			elog.Fatalln("unknown type of parameter")
+			return nil, placeholder, fmt.Errorf("unknown type of parameter")
 		}
 
 	}
