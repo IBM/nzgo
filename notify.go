@@ -68,7 +68,7 @@ func NewListenerConn(name string, notificationChan chan<- *Notification) (*Liste
 func newDialListenerConn(d Dialer, name string, c chan<- *Notification) (*ListenerConn, error) {
 	cn, err := DialOpen(d, name)
 	if err != nil {
-		return nil, err
+		return nil, elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	l := &ListenerConn{
@@ -98,7 +98,7 @@ func (l *ListenerConn) acquireSenderLock() error {
 	l.connectionLock.Unlock()
 	if err != nil {
 		l.senderLock.Unlock()
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 	return nil
 }
@@ -138,7 +138,7 @@ func (l *ListenerConn) listenerConnLoop() (err error) {
 	for {
 		t, err := l.cn.recvMessage(r)
 		if err != nil {
-			return err
+			return elog.Fatalf(chopPath(funName()), err.Error())
 		}
 
 		switch t {
@@ -238,7 +238,7 @@ func (l *ListenerConn) Ping() error {
 	}
 	if err != nil {
 		// shouldn't happen
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 	return nil
 }
@@ -252,7 +252,7 @@ func (l *ListenerConn) sendSimpleQuery(q string) (err error) {
 
 	// must set connection state before sending the query
 	if !l.setState(connStateExpectResponse) {
-		return fmt.Errorf("two queries running at the same time")
+		return elog.Fatalf(chopPath(funName()), "two queries running at the same time")
 	}
 
 	// Can't use l.cn.writeBuf here because it uses the scratch buffer which
@@ -280,7 +280,7 @@ func (l *ListenerConn) sendSimpleQuery(q string) (err error) {
 // all subsequently executed queries will return an error.
 func (l *ListenerConn) ExecSimpleQuery(q string) (executed bool, err error) {
 	if err = l.acquireSenderLock(); err != nil {
-		return false, err
+		return false, elog.Fatalf(chopPath(funName()), err.Error())
 	}
 	defer l.releaseSenderLock()
 
@@ -296,7 +296,7 @@ func (l *ListenerConn) ExecSimpleQuery(q string) (executed bool, err error) {
 		}
 		l.connectionLock.Unlock()
 		l.cn.c.Close()
-		return false, err
+		return false, elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	// now we just wait for a reply..
@@ -308,27 +308,33 @@ func (l *ListenerConn) ExecSimpleQuery(q string) (executed bool, err error) {
 			l.connectionLock.Lock()
 			err := l.err
 			l.connectionLock.Unlock()
-			return false, err
+			if err != nil {
+				return false, elog.Fatalf(chopPath(funName()), err.Error())
+			}
+			return false, nil
 		}
 		switch m.typ {
 		case 'Z':
 			// sanity check
 			if m.err != nil {
-				return false, fmt.Errorf("m.err == nil")
+				return false, elog.Fatalf(chopPath(funName()), "m.err == nil")
 			}
 			// done; err might or might not be set
-			return true, err
+			if err != nil {
+				return true, elog.Fatalf(chopPath(funName()), err.Error())
+			}
+			return true, nil
 
 		case 'E':
 			// sanity check
 			if m.err == nil {
-				return false, fmt.Errorf("m.err == nil")
+				return false, elog.Fatalf(chopPath(funName()), "m.err == nil")
 			}
 			// server responded with an error; ReadyForQuery to follow
 			err = m.err
 
 		default:
-			return false, fmt.Errorf("unknown response for simple query: %q", m.typ)
+			return false, elog.Fatalf(chopPath(funName()), "unknown response for simple query: %q", m.typ)
 		}
 	}
 }
@@ -515,7 +521,7 @@ func (l *Listener) Listen(channel string) error {
 		// resync() to take care of the rest.
 		gotResponse, err := l.cn.Listen(channel)
 		if gotResponse && err != nil {
-			return err
+			return elog.Fatalf(chopPath(funName()), err.Error())
 		}
 	}
 
@@ -559,7 +565,7 @@ func (l *Listener) Unlisten(channel string) error {
 		// a response to our query.
 		gotResponse, err := l.cn.Unlisten(channel)
 		if gotResponse && err != nil {
-			return err
+			return elog.Fatalf(chopPath(funName()), err.Error())
 		}
 	}
 
@@ -586,7 +592,7 @@ func (l *Listener) UnlistenAll() error {
 		// a response to our query.
 		gotResponse, err := l.cn.UnlistenAll()
 		if gotResponse && err != nil {
-			return err
+			return elog.Fatalf(chopPath(funName()), err.Error())
 		}
 	}
 
@@ -621,16 +627,19 @@ func (l *Listener) disconnectCleanup() error {
 	select {
 	case _, ok := <-l.connNotificationChan:
 		if ok {
-			return fmt.Errorf("connNotificationChan not closed")
+			return elog.Fatalf(chopPath(funName()), "connNotificationChan not closed")
 		}
 	default:
-		return fmt.Errorf("connNotificationChan not closed")
+		return elog.Fatalf(chopPath(funName()), "connNotificationChan not closed")
 	}
 
 	err := l.cn.Err()
 	l.cn.Close()
 	l.cn = nil
-	return err
+	if err != nil {
+		return elog.Fatalf(chopPath(funName()), err.Error())
+	}
+	return nil
 }
 
 // Synchronize the list of channels we want to be listening on with the server
@@ -673,7 +682,10 @@ func (l *Listener) resync(cn *ListenerConn, notificationChan <-chan *Notificatio
 			}
 
 		case err := <-doneChan:
-			return err
+			if err != nil {
+				return elog.Fatalf(chopPath(funName()), err.Error())
+			}
+			return nil
 		}
 	}
 }
@@ -690,7 +702,7 @@ func (l *Listener) connect() error {
 	notificationChan := make(chan *Notification, 32)
 	cn, err := newDialListenerConn(l.dialer, l.name, notificationChan)
 	if err != nil {
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	l.lock.Lock()
@@ -699,7 +711,7 @@ func (l *Listener) connect() error {
 	err = l.resync(cn, notificationChan)
 	if err != nil {
 		cn.Close()
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	l.cn = cn

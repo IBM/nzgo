@@ -3,7 +3,6 @@ package hstore
 import (
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"strings"
 )
 
@@ -25,7 +24,7 @@ func hQuote(s interface{}) (string, error) {
 	case string:
 		str = v
 	default:
-		return "", fmt.Errorf("not a string or sql.NullString")
+		return "", elog.Fatalf(chopPath(funName()), "not a string or sql.NullString")
 	}
 
 	str = strings.Replace(str, "\\", "\\\\", -1)
@@ -114,11 +113,11 @@ func (h Hstore) Value() (driver.Value, error) {
 	for key, val := range h.Map {
 		keyRes, err := hQuote(key)
 		if err != nil {
-			return nil, err
+			return nil, elog.Fatalf(chopPath(funName()), err.Error())
 		}
 		valRes, err := hQuote(val)
 		if err != nil {
-			return nil, err
+			return nil, elog.Fatalf(chopPath(funName()), err.Error())
 		}
 		thispart := keyRes + "=>" + valRes
 		parts = append(parts, thispart)

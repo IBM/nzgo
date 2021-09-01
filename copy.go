@@ -123,7 +123,7 @@ awaitCopyInResponse:
 			return nil, err
 		default:
 			ci.setBad()
-			return nil, fmt.Errorf("unknown response for CopyFail: %q", t)
+			return nil, elog.Fatalf(chopPath(funName()), "unknown response for CopyFail: %q", t)
 		}
 	}
 }
@@ -268,7 +268,7 @@ func (ci *copyin) Close() (err error) {
 	// Avoid touching the scratch buffer as resploop could be using it.
 	err = ci.cn.sendSimpleMessage('c')
 	if err != nil {
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	<-ci.done
@@ -276,7 +276,7 @@ func (ci *copyin) Close() (err error) {
 
 	if ci.isErrorSet() {
 		err = ci.err
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 	return nil
 }
