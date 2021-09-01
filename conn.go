@@ -275,8 +275,9 @@ type Driver struct{}
 // Open opens a new connection to the database. name is a connection string.
 // Most users should only use it through database/sql package from the standard
 // library.
-func (d *Driver) Open(name string) (driver.Conn, error) {
-	return Open(name)
+func (d *Driver) Open(name string) (c driver.Conn, err error) {
+	c, err = Open(name)
+	return c, err
 }
 
 func init() {
@@ -513,7 +514,7 @@ func Open(dsn string) (_ driver.Conn, err error) {
 func DialOpen(d Dialer, dsn string) (_ driver.Conn, err error) {
 	c, err := NewConnector(dsn)
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	c.dialer = d
 	return c.open(context.Background())
@@ -740,7 +741,8 @@ func parseOpts(name string, o values) error {
 
 	err := elog.Initialize(o["logLevel"], o["logPath"], o["additionalLogFile"])
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		fmt.Printf(err.Error())
+		return err
 	}
 
 	return nil
