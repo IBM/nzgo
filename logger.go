@@ -163,21 +163,23 @@ func (elog NZLogger) Infoln(args ...interface{}) {
 	Info.Println(args...)
 }
 
-/* Fatal logs error and panic, forcing application to exit with message on stdout */
-func (elog NZLogger) Fatalf(fname string, s string, args ...interface{}) {
+/* Fatal logs error and returns error*/
+func (elog NZLogger) Fatalf(fname string, s string, args ...interface{}) error {
 	prefixStr := prefixString() + "[FATAL] " + fname + " "
 	Fatal.SetFlags(0)
 	Fatal.SetPrefix(prefixStr)
 
-	Fatal.Panic(fmt.Sprintf(s, args...))
+	Fatal.Printf(s, args...)
+	return fmt.Errorf(s, args...)
 }
 
-func (elog NZLogger) Fatalln(args ...interface{}) {
-	prefixStr := prefixString() + "[FATAL] "
+func (elog NZLogger) Fatalln(fname string, args ...interface{}) error {
+	prefixStr := prefixString() + "[FATAL] " + fname + " "
 	Fatal.SetFlags(0)
 	Fatal.SetPrefix(prefixStr)
 
-	Fatal.Panic(args...)
+	Fatal.Println(args...)
+	return fmt.Errorf("", args...)
 }
 
 /* Function name is determined from caller stack at runtime
