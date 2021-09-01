@@ -403,7 +403,7 @@ func (cn *conn) handleDriverSettings(o values) (err error) {
 			} else if value == "no" {
 				*val = false
 			} else {
-				return fmt.Errorf("unrecognized value %q for %s", value, key)
+				return elog.Fatalf(chopPath(funName()), "unrecognized value %q for %s", value, key)
 			}
 		}
 		return nil
@@ -583,7 +583,7 @@ func dial(ctx context.Context, d Dialer, o values) (net.Conn, error) {
 	if timeout, ok := o["connect_timeout"]; ok && timeout != "0" {
 		seconds, err := strconv.ParseInt(timeout, 10, 0)
 		if err != nil {
-			return nil, fmt.Errorf("invalid value for parameter connect_timeout: %s", err)
+			return nil, elog.Fatalf(chopPath(funName()), "invalid value for parameter connect_timeout: %s", err)
 		}
 		duration := time.Duration(seconds) * time.Second
 
@@ -688,7 +688,7 @@ func parseOpts(name string, o values) error {
 
 		// The current character should be =
 		if r != '=' || !ok {
-			return fmt.Errorf(`missing "=" after %q in connection info string"`, string(keyRunes))
+			return elog.Fatalf(chopPath(funName()), `missing "=" after %q in connection info string"`, string(keyRunes))
 		}
 
 		// Skip any whitespace after the =
@@ -702,7 +702,7 @@ func parseOpts(name string, o values) error {
 			for !unicode.IsSpace(r) {
 				if r == '\\' {
 					if r, ok = s.Next(); !ok {
-						return fmt.Errorf(`missing character after backslash`)
+						return elog.Fatalf(chopPath(funName()), `missing character after backslash`)
 					}
 				}
 				valRunes = append(valRunes, r)
@@ -715,7 +715,7 @@ func parseOpts(name string, o values) error {
 		quote:
 			for {
 				if r, ok = s.Next(); !ok {
-					return fmt.Errorf(`unterminated quoted string literal in connection string`)
+					return elog.Fatalf(chopPath(funName()), `unterminated quoted string literal in connection string`)
 				}
 				switch r {
 				case '\'':
@@ -748,7 +748,7 @@ func (cn *conn) isInTransaction() bool {
 func (cn *conn) checkIsInTransaction(intxn bool) error {
 	if cn.isInTransaction() != intxn {
 		cn.bad = true
-		return fmt.Errorf("unexpected transaction status %v", cn.txnStatus)
+		return elog.Fatalf(chopPath(funName()), "unexpected transaction status %v", cn.txnStatus)
 	}
 	return nil
 }
@@ -772,11 +772,11 @@ func (cn *conn) begin(mode string) (_ driver.Tx, err error) {
 
 	if commandTag != "BEGIN" {
 		cn.bad = true
-		return nil, fmt.Errorf("unexpected command tag %s", commandTag)
+		return nil, elog.Fatalf(chopPath(funName()), "unexpected command tag %s", commandTag)
 	}
 	if cn.txnStatus != txnStatusIdleInTransaction {
 		cn.bad = true
-		return nil, fmt.Errorf("unexpected transaction status %v", cn.txnStatus)
+		return nil, elog.Fatalf(chopPath(funName()), "unexpected transaction status %v", cn.txnStatus)
 	}
 	return cn, nil
 }
@@ -818,7 +818,7 @@ func (cn *conn) Commit() (err error) {
 	cn.txnStatus = txnStatusIdle
 	if commandTag != "COMMIT" {
 		cn.bad = true
-		return fmt.Errorf("unexpected command tag %s", commandTag)
+		return elog.Fatalf(chopPath(funName()), "unexpected command tag %s", commandTag)
 	}
 	err = cn.checkIsInTransaction(false)
 	return err
@@ -841,7 +841,7 @@ func (cn *conn) Rollback() (err error) {
 	}
 	cn.txnStatus = txnStatusIdle
 	if commandTag != "ROLLBACK" {
-		return fmt.Errorf("unexpected command tag %s", commandTag)
+		return elog.Fatalf(chopPath(funName()), "unexpected command tag %s", commandTag)
 	}
 	err = cn.checkIsInTransaction(false)
 	return err
@@ -1040,7 +1040,7 @@ func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) er
 
 			// Close the file
 			file.Close()
-			return fmt.Errorf("unload - ErrorMsg: %q, ErrorObj: %q", errorMsg, errorObject)
+			return elog.Fatalf(chopPath(funName()), "unload - ErrorMsg: %q, ErrorObj: %q", errorMsg, errorObject)
 
 		default:
 
@@ -1079,7 +1079,7 @@ func (cn *conn) xferTable() error {
 
 	filehandle, err := os.Open(filename.string())
 	if err != nil { // file open failed
-		return fmt.Errorf("Error opening file: %q", err)
+		return elog.Fatalf(chopPath(funName()), "Error opening file: %q", err)
 	} else {
 
 		elog.Debugln(chopPath(funName()), "Successfully opened External file to read: ", filehandle.Name())
@@ -1434,10 +1434,10 @@ func (cn *conn) prepareTo(query, stmtName string) (*stmt, error) {
 		case 'E':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
-			return st, fmt.Errorf(responseBuf.string())
+			return st, elog.Fatalf(chopPath(funName()), responseBuf.string())
 		default:
 			cn.bad = true
-			return nil, fmt.Errorf("Unexpected response for analyze query: %q", response)
+			return nil, elog.Fatalf(chopPath(funName()), "Unexpected response for analyze query: %q", response)
 			break
 		}
 	}
@@ -1611,7 +1611,7 @@ func (cn *conn) sendSimpleMessage(typ byte) (err error) {
 func (cn *conn) saveMessage(typ byte, buf *readBuf) error {
 	if cn.saveMessageType != 0 {
 		cn.bad = true
-		return fmt.Errorf("unexpected saveMessageType %d", cn.saveMessageType)
+		return elog.Fatalf(chopPath(funName()), "unexpected saveMessageType %d", cn.saveMessageType)
 	}
 	cn.saveMessageType = typ
 	cn.saveMessageBuffer = *buf
@@ -1766,10 +1766,10 @@ func (cn *conn) recvSingleByte() (t byte, err error) {
 		data := make([]byte, 1)
 		nread, err := cn.c.Read(data[:])
 		if nread == 0 {
-			return data[0], fmt.Errorf("Single Byte Read failed; 0 bytes read")
+			return data[0], elog.Fatalf(chopPath(funName()), "Single Byte Read failed; 0 bytes read")
 		}
 		if err != nil {
-			return data[0], fmt.Errorf("Error reading single byte : %s", err)
+			return data[0], elog.Fatalf(chopPath(funName()), "Error reading single byte : %s", err)
 		}
 		return data[0], nil
 	}
@@ -1854,9 +1854,9 @@ func (cn *conn) startup(o values) (err error) {
 			/* We no longer support the old startup packet approach for
 			 * establishing connection
 			 */
-			return fmt.Errorf("Bad attribute value error")
+			return elog.Fatalf(chopPath(funName()), "Bad attribute value error")
 		} else {
-			return fmt.Errorf("Bad protocol error")
+			return elog.Fatalf(chopPath(funName()), "Bad protocol error")
 		}
 
 	}
@@ -1883,7 +1883,7 @@ func (cn *conn) startup(o values) (err error) {
 
 	success, err = cn.Conn_secure_session()
 	if success != true {
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	switch cn.hsVersion {
@@ -2065,7 +2065,7 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 			}
 			continue
 		default:
-			return fmt.Errorf("Unknown response: %d", response)
+			return elog.Fatalf(chopPath(funName()), "Unknown response: %d", response)
 		}
 	}
 
@@ -2197,7 +2197,7 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			return io.EOF
 
 		default:
-			return fmt.Errorf("Unknown response: %d", response)
+			return elog.Fatalf(chopPath(funName()), "Unknown response: %d", response)
 		}
 	}
 
@@ -3045,8 +3045,7 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 			break
 
 		case 'E':
-			elog.Infof(chopPath(funName()), "Error occured, server response : %q", t)
-			err = fmt.Errorf("Error occured, server response : %q", t)
+			err = elog.Fatalf(chopPath(funName()), "Error occured, server response : %q", t)
 			res = false
 			flg = true
 
@@ -3063,7 +3062,7 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 
 		default:
 			elog.Infof(chopPath(funName()), "Unexpected response: %q", t)
-			err = fmt.Errorf("Unexpected response: %q", t)
+			err = elog.Fatalf(chopPath(funName()), "Unexpected response: %q", t)
 			res = false
 		}
 	}
@@ -3154,7 +3153,7 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 
 	default:
 		elog.Infof(chopPath(funName()), "Unknown authentication response: %d", code)
-		err = fmt.Errorf("Unknown authentication response: %d", code)
+		err = elog.Fatalf(chopPath(funName()), "Unknown authentication response: %d", code)
 		res = false
 	}
 	return res, err
@@ -3182,11 +3181,9 @@ func (cn *conn) Conn_send_database(o values) (bool, error) {
 	case 'N':
 		return true, nil
 	case 'E':
-		elog.Infoln(chopPath(funName()), "ERROR_AUTHOR_BAD")
-		return false, fmt.Errorf("ERROR_AUTHOR_BAD")
+		return false, elog.Fatalf(chopPath(funName()), "ERROR_AUTHOR_BAD")
 	default:
-		elog.Infof(chopPath(funName()), "Unknown response: %d", beresp)
-		return false, fmt.Errorf("Unknown response: %d", beresp)
+		return false, elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
 
 	}
 	return false, nil
@@ -3199,6 +3196,7 @@ All other cases of client and server combination will be taken care of.
 No fall back options for preferred cases.
 */
 func (cn *conn) Conn_secure_session() (bool, error) {
+
 	var upgrade func(conn net.Conn) (net.Conn, error)
 	var err error
 	message := HSV2Msg{
@@ -3275,11 +3273,9 @@ func (cn *conn) Conn_secure_session() (bool, error) {
 				}
 				information = 0
 			case 'E':
-				elog.Infoln(chopPath(funName()), "ERROR_CONN_FAIL")
-				return false, fmt.Errorf("ERROR_CONN_FAIL")
+				return false, elog.Fatalf(chopPath(funName()), "ERROR_CONN_FAIL")
 			default:
-				elog.Infof(chopPath(funName()), "Unknown response: %c", beresp)
-				return false, fmt.Errorf("Unknown response: %c", beresp)
+				return false, elog.Fatalf(chopPath(funName()), "Unknown response: %c", beresp)
 			}
 		}
 	}
@@ -3410,11 +3406,9 @@ func (cn *conn) Conn_send_handshake_version2(o values) (status bool, err error) 
 			case 'N':
 				break
 			case 'E':
-				elog.Infoln(chopPath(funName()), "ERROR_CONN_FAIL")
-				return false, fmt.Errorf("ERROR_CONN_FAIL")
+				return false, elog.Fatalf(chopPath(funName()), "ERROR_CONN_FAIL")
 			default:
-				elog.Infof(chopPath(funName()), "Unknown response: %d", beresp)
-				return false, fmt.Errorf("Unknown response: %d", beresp)
+				return false, elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
 			}
 		}
 	}
@@ -3567,11 +3561,9 @@ func (cn *conn) Conn_send_handshake_version4(o values) (status bool, err error) 
 			case 'N':
 				break
 			case 'E':
-				elog.Infoln(chopPath(funName()), "ERROR_CONN_FAIL")
-				return false, fmt.Errorf("ERROR_CONN_FAIL")
+				return false, elog.Fatalf(chopPath(funName()), "ERROR_CONN_FAIL")
 			default:
-				elog.Infof(chopPath(funName()), "Unknown response: %d", beresp)
-				return false, fmt.Errorf("Unknown response: %d", beresp)
+				return false, elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
 			}
 		}
 	}
@@ -3597,11 +3589,11 @@ func (cn *conn) auth(r *readBuf, o values) (err error) {
 		}
 
 		if t != 'R' {
-			return fmt.Errorf("unexpected password response: %q", t)
+			return elog.Fatalf(chopPath(funName()), "unexpected password response: %q", t)
 		}
 
 		if r.int32() != 0 {
-			return fmt.Errorf("unexpected authentication response: %q", t)
+			return elog.Fatalf(chopPath(funName()), "unexpected authentication response: %q", t)
 		}
 	case 5:
 		s := string(r.next(4))
@@ -3617,14 +3609,14 @@ func (cn *conn) auth(r *readBuf, o values) (err error) {
 		}
 
 		if t != 'R' {
-			return fmt.Errorf("unexpected password response: %q", t)
+			return elog.Fatalf(chopPath(funName()), "unexpected password response: %q", t)
 		}
 
 		if r.int32() != 0 {
-			return fmt.Errorf("unexpected authentication response: %q", t)
+			return elog.Fatalf(chopPath(funName()), "unexpected authentication response: %q", t)
 		}
 	default:
-		return fmt.Errorf("unknown authentication response: %d", code)
+		return elog.Fatalf(chopPath(funName()), "unknown authentication response: %d", code)
 	}
 	return nil
 }
@@ -3690,10 +3682,10 @@ func (st *stmt) execQuery(arg []driver.Value) (r driver.Rows, err error) {
 	placeholder = "?"
 	query := st.query
 	if len(arg) >= 65536 {
-		return nil, fmt.Errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
+		return nil, elog.Fatalf(chopPath(funName()), "got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
 	}
 	if len(arg) != len(st.paramTyps) {
-		return nil, fmt.Errorf("got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
+		return nil, elog.Fatalf(chopPath(funName()), "got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
 	}
 	for i := 0; i < len(arg); i++ {
 
@@ -3711,7 +3703,7 @@ func (st *stmt) execQuery(arg []driver.Value) (r driver.Rows, err error) {
 			str := fmt.Sprintf("'%s'", arg[i])
 			query = strings.Replace(query, placeholder, str, 1)
 		default:
-			return nil, fmt.Errorf("unknown type of parameter")
+			return nil, elog.Fatalf(chopPath(funName()), "unknown type of parameter")
 		}
 	}
 	return st.cn.simpleQuery(query)
@@ -3723,10 +3715,10 @@ func (st *stmt) exec(arg []driver.Value) (res driver.Result, commandTag string, 
 	placeholder = "?"
 	query := st.query
 	if len(arg) >= 65536 {
-		return nil, placeholder, fmt.Errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
+		return nil, placeholder, elog.Fatalf(chopPath(funName()), "got %d parameters but PostgreSQL only supports 65535 parameters", len(arg))
 	}
 	if len(arg) != len(st.paramTyps) {
-		return nil, placeholder, fmt.Errorf("got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
+		return nil, placeholder, elog.Fatalf(chopPath(funName()), "got %d parameters but the statement requires %d", len(arg), len(st.paramTyps))
 	}
 	for i := 0; i < len(arg); i++ {
 
@@ -3744,7 +3736,7 @@ func (st *stmt) exec(arg []driver.Value) (res driver.Result, commandTag string, 
 			str := fmt.Sprintf("'%s'", arg[i])
 			query = strings.Replace(query, placeholder, str, 1)
 		default:
-			return nil, placeholder, fmt.Errorf("unknown type of parameter")
+			return nil, placeholder, elog.Fatalf(chopPath(funName()), "unknown type of parameter")
 		}
 
 	}
@@ -3787,7 +3779,7 @@ func (cn *conn) parseComplete(commandTag string) (driver.Result, string, error) 
 		parts := strings.Split(commandTag, " ")
 		if len(parts) != 3 {
 			cn.bad = true
-			return nil, commandTag, fmt.Errorf("unexpected INSERT command tag %s", commandTag)
+			return nil, commandTag, elog.Fatalf(chopPath(funName()), "unexpected INSERT command tag %s", commandTag)
 		}
 		affectedRows = &parts[len(parts)-1]
 		commandTag = "INSERT"
@@ -3799,7 +3791,7 @@ func (cn *conn) parseComplete(commandTag string) (driver.Result, string, error) 
 	n, err := strconv.ParseInt(*affectedRows, 10, 64)
 	if err != nil {
 		cn.bad = true
-		return nil, commandTag, fmt.Errorf("could not parse commandTag: %s", err)
+		return nil, commandTag, elog.Fatalf(chopPath(funName()), "could not parse commandTag: %s", err)
 	}
 	return driver.RowsAffected(n), commandTag, nil
 }
@@ -3939,7 +3931,7 @@ func (cn *conn) sendBinaryParameters(b *writeBuf, args []driver.Value) {
 
 func (cn *conn) sendBinaryModeQuery(query string, args []driver.Value) error {
 	if len(args) >= 65536 {
-		return fmt.Errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(args))
+		return elog.Fatalf(chopPath(funName()), "got %d parameters but PostgreSQL only supports 65535 parameters", len(args))
 	}
 
 	b := cn.writeBuf('P')
@@ -4005,7 +3997,7 @@ func (cn *conn) readReadyForQuery() error {
 		return nil
 	default:
 		cn.bad = true
-		return fmt.Errorf("unexpected message %q; expected ReadyForQuery", t)
+		return elog.Fatalf(chopPath(funName()), "unexpected message %q; expected ReadyForQuery", t)
 	}
 	return nil
 }
@@ -4026,7 +4018,7 @@ func (cn *conn) readParseResponse() error {
 		return err
 	default:
 		cn.bad = true
-		return fmt.Errorf("unexpected Parse response %q", t)
+		return elog.Fatalf(chopPath(funName()), "unexpected Parse response %q", t)
 	}
 }
 
@@ -4051,7 +4043,7 @@ func (cn *conn) readStatementDescribeResponse() (paramTyps []oid.Oid, colNames [
 			return nil, nil, nil, err
 		default:
 			cn.bad = true
-			return nil, nil, nil, fmt.Errorf("unexpected Describe statement response %q", t)
+			return nil, nil, nil, elog.Fatalf(chopPath(funName()), "unexpected Describe statement response %q", t)
 		}
 	}
 }
@@ -4069,7 +4061,7 @@ func (cn *conn) readPortalDescribeResponse() (rowsHeader, error) {
 		return rowsHeader{}, err
 	default:
 		cn.bad = true
-		return rowsHeader{}, fmt.Errorf("unexpected Describe response %q", t)
+		return rowsHeader{}, elog.Fatalf(chopPath(funName()), "unexpected Describe response %q", t)
 	}
 }
 
@@ -4084,7 +4076,7 @@ func (cn *conn) readBindResponse() error {
 		return err
 	default:
 		cn.bad = true
-		return fmt.Errorf("unexpected Bind response %q", t)
+		return elog.Fatalf(chopPath(funName()), "unexpected Bind response %q", t)
 	}
 }
 
@@ -4115,7 +4107,7 @@ func (cn *conn) postExecuteWorkaround() error {
 			return nil
 		default:
 			cn.bad = true
-			return fmt.Errorf("unexpected message during extended query execution: %q", t)
+			return elog.Fatalf(chopPath(funName()), "unexpected message during extended query execution: %q", t)
 		}
 	}
 }
@@ -4128,7 +4120,7 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 		case 'C':
 			if err != nil {
 				cn.bad = true
-				return nil, "", fmt.Errorf("unexpected CommandComplete after error %s", err)
+				return nil, "", elog.Fatalf(chopPath(funName()), "unexpected CommandComplete after error %s", err)
 			}
 			res, commandTag, err = cn.parseComplete(r.string())
 		case 'Z':
@@ -4142,7 +4134,7 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 		case 'T', 'D', 'I':
 			if err != nil {
 				cn.bad = true
-				return nil, "", fmt.Errorf("unexpected %q after error %s", t, err)
+				return nil, "", elog.Fatalf(chopPath(funName()), "unexpected %q after error %s", t, err)
 			}
 			if t == 'I' {
 				res = emptyRows
@@ -4150,7 +4142,7 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 			// ignore any results
 		default:
 			cn.bad = true
-			return nil, "", fmt.Errorf("unknown %s response: %q", protocolState, t)
+			return nil, "", elog.Fatalf(chopPath(funName()), "unknown %s response: %q", protocolState, t)
 		}
 	}
 }
