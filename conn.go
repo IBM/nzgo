@@ -925,7 +925,10 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
 			elog.Infoln(funName(), responseBuf.string())
 		case 'l':
-			cn.xferTable()
+			err := cn.xferTable()
+			if err != nil {
+				return nil, commandTag, err
+			}
 			break
 		case 'x': /* handle Ext Tbl parser abort */
 			cn.recv_n_bytes(4)
@@ -970,7 +973,7 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 				cn.c.Write(buf)
 			}
 		case 'U': /* handle unload data */
-			cn.receiveAndWriteDatatoExternal(fname, fh)
+			err = cn.receiveAndWriteDatatoExternal(fname, fh)
 		default:
 			cn.bad = true
 			errorString := fmt.Sprintf("Unknown response for simple exec: %q", response)
@@ -982,7 +985,7 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 }
 
 /* This is for unloading data recvd via named pipe spawned by datawriter */
-func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) {
+func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) error {
 
 	cn.recv_n_bytes(4)
 	allDone := false
@@ -990,12 +993,14 @@ func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) {
 		//  Get EXTAB_SOCK Status
 		status, err := cn.recv_n_bytes(4)
 		if err != nil {
-			elog.Fatalf(chopPath(funName()), "Error while retrieving status, closing unload file: %q", err)
+			elog.Infof(chopPath(funName()), "Error while retrieving status, closing unload file: %q", err)
 			// Close the file
 			if err := file.Close(); err != nil {
-				elog.Fatalf(chopPath(funName()), "Unable to close the file: %q", err)
+				elog.Infof(chopPath(funName()), "Unable to close the file: %q", err)
+				return err
 			}
 			cn.Sock_clear_socket()
+			return err
 		}
 		switch status.int32() {
 
@@ -1004,7 +1009,8 @@ func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) {
 			numBytes, _ := cn.recv_n_bytes(4)
 			blockBuffer, _ := cn.recv_n_bytes(numBytes.int32())
 			if _, err := file.Write([]byte(blockBuffer)); err != nil {
-				elog.Fatalf(chopPath(funName()), "Error in writing data to file: %q", err)
+				elog.Infof(chopPath(funName()), "Error in writing data to file: %q", err)
+				return err
 			} else {
 				elog.Debugln(chopPath(funName()), "Successfully written data into file", file.Name())
 			}
@@ -1013,7 +1019,8 @@ func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) {
 		case EXTAB_SOCK_DONE:
 
 			if err := file.Close(); err != nil {
-				elog.Fatalf(chopPath(funName()), "Unable to close the file: %q", err)
+				elog.Infof(chopPath(funName()), "Unable to close the file: %q", err)
+				return err
 			}
 			elog.Debugln(chopPath(funName()), "unload - done receiving data")
 			allDone = true
@@ -1029,28 +1036,26 @@ func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) {
 			len = errNo.int16()
 			errorObject, _ := cn.recv_n_bytes(len)
 
-			elog.Fatalf(chopPath(funName()), "unload - ErrorMsg: %q", errorMsg)
-			elog.Fatalf(chopPath(funName()), "unload - ErrorObj: %q", errorObject)
+			elog.Infof(chopPath(funName()), "unload - ErrorMsg: %q, ErrorObj: %q", errorMsg, errorObject)
 
 			// Close the file
-			if err := file.Close(); err != nil {
-				elog.Fatalf(chopPath(funName()), "Unable to close the file: %q", err)
-			}
-			return
+			file.Close()
+			return fmt.Errorf("unload - ErrorMsg: %q, ErrorObj: %q", errorMsg, errorObject)
 
 		default:
 
 			if err := file.Close(); err != nil {
-				elog.Fatalf(chopPath(funName()), "Unable to close the file: %q", err)
+				elog.Infof(chopPath(funName()), "Unable to close the file: %q", err)
+				return err
 			}
 			cn.Sock_clear_socket()
-			return
+			return nil
 		}
-
 	}
+	return nil
 }
 
-func (cn *conn) xferTable() {
+func (cn *conn) xferTable() error {
 
 	cn.recv_n_bytes(4)
 	var clientversion int = 1
@@ -1074,7 +1079,7 @@ func (cn *conn) xferTable() {
 
 	filehandle, err := os.Open(filename.string())
 	if err != nil { // file open failed
-		elog.Fatalf(chopPath(funName()), "Error opening file: %q", err)
+		return fmt.Errorf("Error opening file: %q", err)
 	} else {
 
 		elog.Debugln(chopPath(funName()), "Successfully opened External file to read: ", filehandle.Name())
@@ -1090,7 +1095,7 @@ func (cn *conn) xferTable() {
 		_, _ = cn.c.Write([]byte{'\x00', '\x00', '\x00', byte(EXTAB_SOCK_DONE)})
 		elog.Debugln(chopPath(funName()), "sent EXTAB_SOCK_DONE to reader ")
 	}
-
+	return nil
 }
 
 /**************************************************************************
@@ -1133,7 +1138,7 @@ func (cn *conn) getFileFromBE(logDir string, filename string, logType int) bool 
 	}
 
 	if err != nil { // file open failed
-		elog.Fatalf(chopPath(funName()), "Error opening file: %q", err)
+		elog.Infof(chopPath(funName()), "Error opening file: %q", err)
 		status = false
 	}
 
@@ -1150,7 +1155,7 @@ func (cn *conn) getFileFromBE(logDir string, filename string, logType int) bool 
 
 		if status {
 			if _, err := fh.Write([]byte(dataBuffer)); err != nil {
-				elog.Fatalf(chopPath(funName()), "Error in writing data to file: %q", err)
+				elog.Infof(chopPath(funName()), "Error in writing data to file: %q", err)
 				status = false
 			} else {
 				elog.Debugln(chopPath(funName()), "Successfully written data into file", fh.Name())
@@ -1159,7 +1164,7 @@ func (cn *conn) getFileFromBE(logDir string, filename string, logType int) bool 
 	}
 
 	if err := fh.Close(); err != nil {
-		elog.Fatalf(chopPath(funName()), "Unable to close the file: %q", err)
+		elog.Infof(chopPath(funName()), "Unable to close the file: %q", err)
 	}
 
 	return status
@@ -1229,7 +1234,10 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			elog.Infoln(funName(), errorString)
 			return res, err
 		case 'l':
-			cn.xferTable()
+			err := cn.xferTable()
+			if err != nil {
+				return nil, err
+			}
 			break
 		case 'x': /* handle Ext Tbl parser abort */
 			cn.recv_n_bytes(4)
@@ -1426,11 +1434,9 @@ func (cn *conn) prepareTo(query, stmtName string) (*stmt, error) {
 		case 'E':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
-			//elog.Fatalln(funName(), responseBuf.string())
 			return st, fmt.Errorf(responseBuf.string())
 		default:
 			cn.bad = true
-			//elog.Fatalf(chopPath(funName()), "Unexpected response for analyze query: %q", response)
 			return nil, fmt.Errorf("Unexpected response for analyze query: %q", response)
 			break
 		}
@@ -1573,13 +1579,15 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 	return r, err
 }
 
-func (cn *conn) send(m *writeBuf) {
+func (cn *conn) send(m *writeBuf) error {
 	elog.Debugln(chopPath(funName()), "Sock write buffer  ", m.wrap())
 	//wrap function appends length of the data in int32 format
 	_, err := cn.c.Write(m.wrap())
 	if err != nil {
-		elog.Fatalln(chopPath(funName()), "Error : ", err)
+		elog.Infoln(chopPath(funName()), "Error : ", err)
+		return err
 	}
+	return nil
 }
 
 func (cn *conn) sendStartupPacket(m *writeBuf) error {
@@ -1797,8 +1805,10 @@ func (cn *conn) startup(o values) (err error) {
 	b.int16(versionPacket.opcode)
 	b.int16(versionPacket.version)
 	elog.Debugln(chopPath(funName()), "Sending version ", versionPacket.version)
-	cn.send(b)
-
+	err = cn.send(b)
+	if err != nil {
+		return err
+	}
 	//Handskhake negotiation with server
 	for {
 		beresp, _ := cn.recvSingleByte()
@@ -1835,7 +1845,10 @@ func (cn *conn) startup(o values) (err error) {
 			b.int16(versionPacket.opcode)
 			b.int16(versionPacket.version)
 			elog.Debugln(chopPath(funName()), "Sending version ", versionPacket.version)
-			cn.send(b)
+			err = cn.send(b)
+			if err != nil {
+				return err
+			}
 
 		} else if beresp == 'E' {
 			/* We no longer support the old startup packet approach for
@@ -1858,7 +1871,7 @@ func (cn *conn) startup(o values) (err error) {
 
 	//Send handshake information to server
 	elog.Infoln("Send handshake information to server")
-	success := cn.Conn_send_database(o)
+	success, err := cn.Conn_send_database(o)
 	if success != true {
 		return err
 	}
@@ -1868,7 +1881,7 @@ func (cn *conn) startup(o values) (err error) {
 		return err
 	}
 
-	success = cn.Conn_secure_session()
+	success, err = cn.Conn_secure_session()
 	if success != true {
 		return err
 	}
@@ -1877,15 +1890,15 @@ func (cn *conn) startup(o values) (err error) {
 	case CP_VERSION_6:
 		fallthrough
 	case CP_VERSION_4:
-		success = cn.Conn_send_handshake_version4(o)
+		success, err = cn.Conn_send_handshake_version4(o)
 		break
 	case CP_VERSION_5:
 		fallthrough
 	case CP_VERSION_3:
-		success = cn.Conn_send_handshake_version2(o)
+		success, err = cn.Conn_send_handshake_version2(o)
 		break
 	case CP_VERSION_2:
-		success = cn.Conn_send_handshake_version2(o)
+		success, err = cn.Conn_send_handshake_version2(o)
 		break
 	}
 	if success != true {
@@ -1893,7 +1906,7 @@ func (cn *conn) startup(o values) (err error) {
 	}
 
 	//Authenticate the user
-	success = cn.Conn_authenticate(o)
+	success, err = cn.Conn_authenticate(o)
 	if success != true {
 		return err
 	}
@@ -3002,7 +3015,7 @@ func (cn *conn) Sock_clear_socket() {
 	cn.c.Read(p)
 }
 
-func (cn *conn) Conn_processAuthResponse() bool {
+func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 	flg := false
 	res := true
 	for flg != true {
@@ -3032,7 +3045,8 @@ func (cn *conn) Conn_processAuthResponse() bool {
 			break
 
 		case 'E':
-			elog.Fatalf(chopPath(funName()), "Error occured, server response : %q", t)
+			elog.Infof(chopPath(funName()), "Error occured, server response : %q", t)
+			err = fmt.Errorf("Error occured, server response : %q", t)
 			res = false
 			flg = true
 
@@ -3048,13 +3062,14 @@ func (cn *conn) Conn_processAuthResponse() bool {
 			elog.Infof(chopPath(funName()), "Message(Notice) received %s\n", notice.noticetag)
 
 		default:
-			elog.Fatalf(chopPath(funName()), "Unexpected response: %q", t)
+			elog.Infof(chopPath(funName()), "Unexpected response: %q", t)
+			err = fmt.Errorf("Unexpected response: %q", t)
 			res = false
 		}
 	}
-	return res
+	return res, err
 }
-func (cn *conn) Conn_authenticate(o values) bool {
+func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 
 	var x readBuf
 	t, _ := cn.recvSingleByte() //Expecting 'R'
@@ -3064,7 +3079,7 @@ func (cn *conn) Conn_authenticate(o values) bool {
 	elog.Debugf(chopPath(funName()), "Backend response  %c\n", t)
 
 	if t != 'R' {
-		return false
+		return false, nil
 	}
 
 	x, _ = cn.recv_n_bytes(4) //type of password
@@ -3080,9 +3095,12 @@ func (cn *conn) Conn_authenticate(o values) bool {
 		w := cn.writeBuf('p')
 		w.string(o["password"])
 		elog.Debugf(chopPath(funName()), "Password  %s\n", o["password"])
-		cn.send(w)
+		err = cn.send(w)
+		if err != nil {
+			return false, err
+		}
 
-		res = cn.Conn_processAuthResponse()
+		res, err = cn.Conn_processAuthResponse()
 		break
 
 	case AUTH_REQ_MD5: //md5
@@ -3103,9 +3121,12 @@ func (cn *conn) Conn_authenticate(o values) bool {
 		elog.Debugln(chopPath(funName()), "Encoded(Base 64bit) ", sFinal)
 
 		w.string(sFinal)
-		cn.send(w) //send md5 encoded hash
+		err = cn.send(w) //send md5 encoded hash
+		if err != nil {
+			return false, err
+		}
 
-		res = cn.Conn_processAuthResponse() //process server response
+		res, err = cn.Conn_processAuthResponse() //process server response
 
 	case AUTH_REQ_SHA256:
 		elog.Debugln(chopPath(funName()), "Password type SHA256")
@@ -3125,17 +3146,21 @@ func (cn *conn) Conn_authenticate(o values) bool {
 		elog.Debugln(chopPath(funName()), "Encoded(Base 64bit) ", sFinal)
 
 		w.string(sFinal)
-		cn.send(w)                          //send md5 encoded hash
-		res = cn.Conn_processAuthResponse() //process server response
+		err = cn.send(w) //send md5 encoded hash
+		if err != nil {
+			return false, err
+		}
+		res, err = cn.Conn_processAuthResponse() //process server response
 
 	default:
-		elog.Fatalf(chopPath(funName()), "Unknown authentication response: %d", code)
+		elog.Infof(chopPath(funName()), "Unknown authentication response: %d", code)
+		err = fmt.Errorf("Unknown authentication response: %d", code)
 		res = false
 	}
-	return res
+	return res, err
 }
 
-func (cn *conn) Conn_send_database(o values) bool {
+func (cn *conn) Conn_send_database(o values) (bool, error) {
 
 	message := HSV2Msg{
 		opcode:  HSV2_DB,
@@ -3146,22 +3171,25 @@ func (cn *conn) Conn_send_database(o values) bool {
 
 	b.int16(message.opcode)
 	b.string(message.payload)
-	cn.send(b)
+	err := cn.send(b)
+	if err != nil {
+		return false, err
+	}
 
 	beresp, _ := cn.recvSingleByte()
 	elog.Debugf(chopPath(funName()), "Backend response %c \n", beresp)
 	switch beresp {
 	case 'N':
-		return true
+		return true, nil
 	case 'E':
-		elog.Fatalln(chopPath(funName()), "ERROR_AUTHOR_BAD")
-		return false
+		elog.Infoln(chopPath(funName()), "ERROR_AUTHOR_BAD")
+		return false, fmt.Errorf("ERROR_AUTHOR_BAD")
 	default:
-		elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
-		return false
+		elog.Infof(chopPath(funName()), "Unknown response: %d", beresp)
+		return false, fmt.Errorf("Unknown response: %d", beresp)
 
 	}
-	return false
+	return false, nil
 }
 
 /*Cases which will fail:
@@ -3170,7 +3198,7 @@ Client-> Preferred Unsecured; Server-> Only Secured
 All other cases of client and server combination will be taken care of.
 No fall back options for preferred cases.
 */
-func (cn *conn) Conn_secure_session() bool {
+func (cn *conn) Conn_secure_session() (bool, error) {
 	var upgrade func(conn net.Conn) (net.Conn, error)
 	var err error
 	message := HSV2Msg{
@@ -3206,8 +3234,10 @@ func (cn *conn) Conn_secure_session() bool {
 		b.int32(currSecLevel)
 		elog.Debugln(chopPath(funName()), "Connection security ", message.opcode, message.payload)
 
-		cn.send(b)
-
+		err = cn.send(b)
+		if err != nil {
+			return false, err
+		}
 		if information == HSV2_SSL_CONNECT {
 			cn.c, err = upgrade(cn.c) //It updates connection with SSL
 			if err == nil {
@@ -3245,15 +3275,15 @@ func (cn *conn) Conn_secure_session() bool {
 				}
 				information = 0
 			case 'E':
-				elog.Fatalln(chopPath(funName()), "ERROR_CONN_FAIL")
-				return false
+				elog.Infoln(chopPath(funName()), "ERROR_CONN_FAIL")
+				return false, fmt.Errorf("ERROR_CONN_FAIL")
 			default:
-				elog.Fatalf(chopPath(funName()), "Unknown response: %c", beresp)
-				return false
+				elog.Infof(chopPath(funName()), "Unknown response: %c", beresp)
+				return false, fmt.Errorf("Unknown response: %c", beresp)
 			}
 		}
 	}
-	return true
+	return true, nil
 }
 
 func (cn *conn) Conn_set_next_dataprotocol() bool {
@@ -3278,7 +3308,7 @@ func (cn *conn) Conn_set_next_dataprotocol() bool {
 	return true
 }
 
-func (cn *conn) Conn_send_handshake_version2(o values) bool {
+func (cn *conn) Conn_send_handshake_version2(o values) (status bool, err error) {
 
 	message := HSV2Msg{
 		opcode:  0,
@@ -3369,7 +3399,10 @@ func (cn *conn) Conn_send_handshake_version2(o values) bool {
 			break
 		}
 
-		cn.send(b)
+		err = cn.send(b)
+		if err != nil {
+			return false, err
+		}
 		if information != 0 {
 			beresp, _ := cn.recvSingleByte()
 			elog.Debugf(chopPath(funName()), "Backend response %c \n", beresp)
@@ -3377,18 +3410,18 @@ func (cn *conn) Conn_send_handshake_version2(o values) bool {
 			case 'N':
 				break
 			case 'E':
-				elog.Fatalln(chopPath(funName()), "ERROR_CONN_FAIL")
-				return false
+				elog.Infoln(chopPath(funName()), "ERROR_CONN_FAIL")
+				return false, fmt.Errorf("ERROR_CONN_FAIL")
 			default:
-				elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
-				return false
+				elog.Infof(chopPath(funName()), "Unknown response: %d", beresp)
+				return false, fmt.Errorf("Unknown response: %d", beresp)
 			}
 		}
 	}
-	return true
+	return true, nil
 }
 
-func (cn *conn) Conn_send_handshake_version4(o values) bool {
+func (cn *conn) Conn_send_handshake_version4(o values) (status bool, err error) {
 
 	message := HSV2Msg{
 		opcode:  0,
@@ -3523,7 +3556,10 @@ func (cn *conn) Conn_send_handshake_version4(o values) bool {
 			break
 		}
 
-		cn.send(b)
+		err = cn.send(b)
+		if err != nil {
+			return false, err
+		}
 		if information != 0 {
 			beresp, _ := cn.recvSingleByte()
 			elog.Debugf(chopPath(funName()), "Backend response %c \n", beresp)
@@ -3531,15 +3567,15 @@ func (cn *conn) Conn_send_handshake_version4(o values) bool {
 			case 'N':
 				break
 			case 'E':
-				elog.Fatalln(chopPath(funName()), "ERROR_CONN_FAIL")
-				return false
+				elog.Infoln(chopPath(funName()), "ERROR_CONN_FAIL")
+				return false, fmt.Errorf("ERROR_CONN_FAIL")
 			default:
-				elog.Fatalf(chopPath(funName()), "Unknown response: %d", beresp)
-				return false
+				elog.Infof(chopPath(funName()), "Unknown response: %d", beresp)
+				return false, fmt.Errorf("Unknown response: %d", beresp)
 			}
 		}
 	}
-	return true
+	return true, nil
 }
 
 func (cn *conn) auth(r *readBuf, o values) (err error) {
@@ -3550,7 +3586,10 @@ func (cn *conn) auth(r *readBuf, o values) (err error) {
 	case 3:
 		w := cn.writeBuf('p')
 		w.string(o["password"])
-		cn.send(w)
+		err = cn.send(w)
+		if err != nil {
+			return err
+		}
 
 		t, r, err := cn.recv()
 		if err != nil {
@@ -3568,8 +3607,10 @@ func (cn *conn) auth(r *readBuf, o values) (err error) {
 		s := string(r.next(4))
 		w := cn.writeBuf('p')
 		w.string("md5" + md5s(md5s(o["password"]+o["user"])+s))
-		cn.send(w)
-
+		err = cn.send(w)
+		if err != nil {
+			return err
+		}
 		t, r, err := cn.recv()
 		if err != nil {
 			return err
@@ -3920,7 +3961,10 @@ func (cn *conn) sendBinaryModeQuery(query string, args []driver.Value) error {
 	b.int32(0)
 
 	b.next('S')
-	cn.send(b)
+	err := cn.send(b)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
