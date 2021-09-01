@@ -745,11 +745,12 @@ func (cn *conn) isInTransaction() bool {
 		cn.txnStatus == txnStatusInFailedTransaction
 }
 
-func (cn *conn) checkIsInTransaction(intxn bool) {
+func (cn *conn) checkIsInTransaction(intxn bool) error {
 	if cn.isInTransaction() != intxn {
 		cn.bad = true
-		errorf("unexpected transaction status %v", cn.txnStatus)
+		return fmt.Errorf("unexpected transaction status %v", cn.txnStatus)
 	}
+	return nil
 }
 
 func (cn *conn) Begin() (_ driver.Tx, err error) {
@@ -762,7 +763,7 @@ func (cn *conn) begin(mode string) (_ driver.Tx, err error) {
 	}
 	defer cn.errRecover(&err)
 
-	cn.checkIsInTransaction(false)
+	err = cn.checkIsInTransaction(false)
 	_, commandTag, err := cn.simpleExec("BEGIN")
 	if err != nil {
 		return nil, err
@@ -793,7 +794,7 @@ func (cn *conn) Commit() (err error) {
 	}
 	defer cn.errRecover(&err)
 
-	cn.checkIsInTransaction(true)
+	err = cn.checkIsInTransaction(true)
 	// We don't want the client to think that everything is okay if it tries
 	// to commit a failed transaction.  However, no matter what we return,
 	// database/sql will release this connection back into the free connection
@@ -819,8 +820,8 @@ func (cn *conn) Commit() (err error) {
 		cn.bad = true
 		return fmt.Errorf("unexpected command tag %s", commandTag)
 	}
-	cn.checkIsInTransaction(false)
-	return nil
+	err = cn.checkIsInTransaction(false)
+	return err
 }
 
 func (cn *conn) Rollback() (err error) {
@@ -830,7 +831,7 @@ func (cn *conn) Rollback() (err error) {
 	}
 	defer cn.errRecover(&err)
 
-	cn.checkIsInTransaction(true)
+	err = cn.checkIsInTransaction(true)
 	_, commandTag, err := cn.simpleExec("ROLLBACK")
 	if err != nil {
 		if cn.isInTransaction() {
@@ -842,8 +843,8 @@ func (cn *conn) Rollback() (err error) {
 	if commandTag != "ROLLBACK" {
 		return fmt.Errorf("unexpected command tag %s", commandTag)
 	}
-	cn.checkIsInTransaction(false)
-	return nil
+	err = cn.checkIsInTransaction(false)
+	return err
 }
 
 func (cn *conn) gname() string {
@@ -893,7 +894,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 	cn.status = CONN_EXECUTING
 
 	for {
-		response, err := cn.recvSingleByte()
+		var response byte
+		response, err = cn.recvSingleByte()
 		if err != nil {
 			elog.Infoln(chopPath(funName()), "Error: ", err)
 			return emptyRows, commandTag, err
@@ -905,7 +907,7 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 		case 'C':
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
-			res, commandTag = cn.parseComplete(responseBuf.string())
+			res, commandTag, err = cn.parseComplete(responseBuf.string())
 		case 'Z': /* Backend is ready for new query (6.4) */
 			return res, commandTag, err
 		case 'E':
@@ -1488,9 +1490,11 @@ func (cn *conn) query(query string, args []driver.Value) (_ *rows, err error) {
 	}
 
 	if cn.binaryParameters {
-		cn.sendBinaryModeQuery(query, args)
-
-		err := cn.readParseResponse()
+		err = cn.sendBinaryModeQuery(query, args)
+		if err != nil {
+			return nil, err
+		}
+		err = cn.readParseResponse()
 		if err != nil {
 			return nil, err
 		}
@@ -1535,9 +1539,11 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 	}
 
 	if cn.binaryParameters {
-		cn.sendBinaryModeQuery(query, args)
-
-		err := cn.readParseResponse()
+		err = cn.sendBinaryModeQuery(query, args)
+		if err != nil {
+			return nil, err
+		}
+		err = cn.readParseResponse()
 		if err != nil {
 			return nil, err
 		}
@@ -1594,13 +1600,14 @@ func (cn *conn) sendSimpleMessage(typ byte) (err error) {
 // method is useful in cases where you have to see what the next message is
 // going to be (e.g. to see whether it's an error or not) but you can't handle
 // the message yourself.
-func (cn *conn) saveMessage(typ byte, buf *readBuf) {
+func (cn *conn) saveMessage(typ byte, buf *readBuf) error {
 	if cn.saveMessageType != 0 {
 		cn.bad = true
-		errorf("unexpected saveMessageType %d", cn.saveMessageType)
+		return fmt.Errorf("unexpected saveMessageType %d", cn.saveMessageType)
 	}
 	cn.saveMessageType = typ
 	cn.saveMessageBuffer = *buf
+	return nil
 }
 
 // recvMessage receives any message from the backend, or returns an error if
@@ -2025,7 +2032,7 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 			cn.recvSingleByte()
 			responseBuf, _ := cn.recv_n_bytes(int(length))
 			elog.Debugln(chopPath(funName()), "Reading message from backend ", responseBuf)
-			cn.saveMessage(response, &responseBuf)
+			err = cn.saveMessage(response, &responseBuf)
 			response, err = res.readTuplesForCatalogueQuery(dest)
 			if err != nil {
 				return err
@@ -2037,7 +2044,7 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 				cn.recvSingleByte()
 				responseBuf, _ := cn.recv_n_bytes(int(length))
 				elog.Debugln(chopPath(funName()), "Reading message from backend ", responseBuf)
-				cn.saveMessage(response, &responseBuf)
+				err = cn.saveMessage(response, &responseBuf)
 				response, err = res.readTuplesForCatalogueQuery(dest)
 				if err != nil {
 					return err
@@ -2100,7 +2107,6 @@ func (rs *rows) readTuples(dest []driver.Value) (err error) {
 }
 
 func (res *rows) Next(dest []driver.Value) (err error) {
-
 	if res.done {
 		return io.EOF
 	}
@@ -2141,7 +2147,7 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			length, _ := cn.recv_n_bytes(4)
 			responseBuf, _ := cn.recv_n_bytes(int(length.int32()))
 			elog.Debugln(chopPath(funName()), "Reading message from backend ", responseBuf)
-			cn.saveMessage(response, &responseBuf)
+			err = cn.saveMessage(response, &responseBuf)
 			err = res.readTuples(dest)
 			if err != nil {
 				return err
@@ -3711,8 +3717,8 @@ func (st *stmt) NumInput() int {
 // parseComplete parses the "command tag" from a CommandComplete message, and
 // returns the number of rows affected (if applicable) and a string
 // identifying only the command that was executed, e.g. "ALTER TABLE".  If the
-// command tag could not be parsed, parseComplete panics.
-func (cn *conn) parseComplete(commandTag string) (driver.Result, string) {
+// command tag could not be parsed, parseComplete returns error.
+func (cn *conn) parseComplete(commandTag string) (driver.Result, string, error) {
 	commandsWithAffectedRows := []string{
 		"SELECT ",
 		// INSERT is handled below
@@ -3740,21 +3746,21 @@ func (cn *conn) parseComplete(commandTag string) (driver.Result, string) {
 		parts := strings.Split(commandTag, " ")
 		if len(parts) != 3 {
 			cn.bad = true
-			errorf("unexpected INSERT command tag %s", commandTag)
+			return nil, commandTag, fmt.Errorf("unexpected INSERT command tag %s", commandTag)
 		}
 		affectedRows = &parts[len(parts)-1]
 		commandTag = "INSERT"
 	}
 	// There should be no affected rows attached to the tag, just return it
 	if affectedRows == nil {
-		return driver.RowsAffected(0), commandTag
+		return driver.RowsAffected(0), commandTag, nil
 	}
 	n, err := strconv.ParseInt(*affectedRows, 10, 64)
 	if err != nil {
 		cn.bad = true
-		errorf("could not parse commandTag: %s", err)
+		return nil, commandTag, fmt.Errorf("could not parse commandTag: %s", err)
 	}
-	return driver.RowsAffected(n), commandTag
+	return driver.RowsAffected(n), commandTag, nil
 }
 
 type rowsHeader struct {
@@ -3890,9 +3896,9 @@ func (cn *conn) sendBinaryParameters(b *writeBuf, args []driver.Value) {
 	}
 }
 
-func (cn *conn) sendBinaryModeQuery(query string, args []driver.Value) {
+func (cn *conn) sendBinaryModeQuery(query string, args []driver.Value) error {
 	if len(args) >= 65536 {
-		errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(args))
+		return fmt.Errorf("got %d parameters but PostgreSQL only supports 65535 parameters", len(args))
 	}
 
 	b := cn.writeBuf('P')
@@ -3915,6 +3921,8 @@ func (cn *conn) sendBinaryModeQuery(query string, args []driver.Value) {
 
 	b.next('S')
 	cn.send(b)
+
+	return nil
 }
 
 func (cn *conn) processParameterStatus(r *readBuf) {
@@ -3945,16 +3953,17 @@ func (cn *conn) processReadyForQuery(r *readBuf) {
 	cn.txnStatus = transactionStatus(r.byte())
 }
 
-func (cn *conn) readReadyForQuery() {
+func (cn *conn) readReadyForQuery() error {
 	t, r := cn.recv1()
 	switch t {
 	case 'Z':
 		cn.processReadyForQuery(r)
-		return
+		return nil
 	default:
 		cn.bad = true
-		errorf("unexpected message %q; expected ReadyForQuery", t)
+		return fmt.Errorf("unexpected message %q; expected ReadyForQuery", t)
 	}
+	return nil
 }
 
 func (cn *conn) processBackendKeyData(r *readBuf) {
@@ -4055,7 +4064,10 @@ func (cn *conn) postExecuteWorkaround() error {
 			return err
 		case 'C', 'D', 'I':
 			// the query didn't fail, but we can't process this message
-			cn.saveMessage(t, r)
+			err := cn.saveMessage(t, r)
+			if err != nil {
+				return err
+			}
 			return nil
 		default:
 			cn.bad = true
@@ -4072,9 +4084,9 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 		case 'C':
 			if err != nil {
 				cn.bad = true
-				errorf("unexpected CommandComplete after error %s", err)
+				return nil, "", fmt.Errorf("unexpected CommandComplete after error %s", err)
 			}
-			res, commandTag = cn.parseComplete(r.string())
+			res, commandTag, err = cn.parseComplete(r.string())
 		case 'Z':
 			cn.processReadyForQuery(r)
 			if res == nil && err == nil {
@@ -4086,7 +4098,7 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 		case 'T', 'D', 'I':
 			if err != nil {
 				cn.bad = true
-				errorf("unexpected %q after error %s", t, err)
+				return nil, "", fmt.Errorf("unexpected %q after error %s", t, err)
 			}
 			if t == 'I' {
 				res = emptyRows
@@ -4094,7 +4106,7 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 			// ignore any results
 		default:
 			cn.bad = true
-			errorf("unknown %s response: %q", protocolState, t)
+			return nil, "", fmt.Errorf("unknown %s response: %q", protocolState, t)
 		}
 	}
 }
