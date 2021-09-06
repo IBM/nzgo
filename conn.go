@@ -741,7 +741,6 @@ func parseOpts(name string, o values) error {
 
 	err := elog.Initialize(o["logLevel"], o["logPath"], o["additionalLogFile"])
 	if err != nil {
-		fmt.Printf(err.Error())
 		return err
 	}
 
@@ -1822,7 +1821,7 @@ func (cn *conn) recvSingleByte() (t byte, err error) {
 			return data[0], elog.Fatalf(chopPath(funName()), "Single Byte Read failed; 0 bytes read")
 		}
 		if err != nil {
-			return data[0], elog.Fatalf(chopPath(funName()), "Error reading single byte : %s", err)
+			return data[0], elog.Fatalf(chopPath(funName()), "Error reading single byte : %q", err)
 		}
 		return data[0], nil
 	}
@@ -1835,7 +1834,7 @@ func (cn *conn) recv_n_bytes(n int) (r readBuf, err error) {
 		for totalRead < n {
 			nread, err := cn.c.Read(data[totalRead:]) // it reads max 1024bytes in one go. Which also has handhsake data. If large data read is getting processed this is very imp
 			if err != nil {
-				return data, elog.Fatalf(chopPath(funName()), "Error reading n bytes : ", n, err)
+				return data, elog.Fatalln(chopPath(funName()), "Error reading n bytes : ", n, err)
 			}
 			totalRead = totalRead + nread
 		}
