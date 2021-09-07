@@ -47,7 +47,7 @@ func (fd fieldDesc) Name() string {
 
 func (fd fieldDesc) Length() (length int64, ok bool) {
 	switch fd.OID {
-	case oid.T_text, oid.T_bytea, oid.T_json, oid.T_jsonb, oid.T_jsopath:
+	case oid.T_text, oid.T_bytea, oid.T_json, oid.T_jsonb, oid.T_jsonpath:
 		return -1, true
 	case oid.T_varchar, oid.T_bpchar, oid.T_nvarchar, oid.T_nchar, oid.T_st_geometry, oid.T_varbinary:
 		return int64(fd.Mod - headerSize), true
