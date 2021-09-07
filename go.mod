@@ -7,6 +7,7 @@ require(
 
 // Do not use these versions
 retract (
+	v12.0.4
 	v12.0.2
 	v12.0.0
 )
