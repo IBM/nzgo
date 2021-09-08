@@ -98,13 +98,13 @@ awaitCopyInResponse:
 		case 'Z':
 			if err == nil {
 				ci.setBad()
-				errorf("unexpected ReadyForQuery in response to COPY")
+				return nil, fmt.Errorf("unexpected ReadyForQuery in response to COPY")
 			}
 			cn.processReadyForQuery(r)
 			return nil, err
 		default:
 			ci.setBad()
-			errorf("unknown response for copy query: %q", t)
+			return nil, fmt.Errorf("unknown response for copy query: %q", t)
 		}
 	}
 
@@ -123,7 +123,7 @@ awaitCopyInResponse:
 			return nil, err
 		default:
 			ci.setBad()
-			errorf("unknown response for CopyFail: %q", t)
+			return nil, elog.Fatalf(chopPath(funName()), "unknown response for CopyFail: %q", t)
 		}
 	}
 }
@@ -134,7 +134,7 @@ func (ci *copyin) flush(buf []byte) {
 
 	_, err := ci.cn.c.Write(buf)
 	if err != nil {
-		panic(err)
+		elog.Infoln(chopPath(funName()), "Error : ", err)
 	}
 }
 
@@ -268,7 +268,7 @@ func (ci *copyin) Close() (err error) {
 	// Avoid touching the scratch buffer as resploop could be using it.
 	err = ci.cn.sendSimpleMessage('c')
 	if err != nil {
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 
 	<-ci.done
@@ -276,7 +276,7 @@ func (ci *copyin) Close() (err error) {
 
 	if ci.isErrorSet() {
 		err = ci.err
-		return err
+		return elog.Fatalf(chopPath(funName()), err.Error())
 	}
 	return nil
 }

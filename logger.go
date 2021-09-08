@@ -46,7 +46,7 @@ func Init() {
 }
 
 /* Initialize logger and set output to file */
-func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
+func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) (err error) {
 	elog.LogLevel = logLevel
 	elog.LogPath = logPath
 	elog.AdditionalLogFile = additionalLogFile
@@ -75,7 +75,7 @@ func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 	/* Open file with permissions USER:read and write; GROUP&OTHERS:read */
 	fh, err := os.OpenFile(fname, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		errorf("Error opening logger file")
+		return err
 	}
 	var additionalFh *os.File
 	if elog.AdditionalLogFile != "" {
@@ -85,7 +85,7 @@ func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 			additionalFh, err = os.OpenFile(elog.AdditionalLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		}
 		if err != nil {
-			errorf("Error opening logger file")
+			return err
 		}
 	}
 
@@ -112,7 +112,7 @@ func (elog *NZLogger) Initialize(logLevel, logPath, additionalLogFile string) {
 
 		// case default : //It will do nothing to discard the log output but log file with banner will be generated
 	}
-
+	return nil
 }
 
 /* Used to write banner for logger. ToDo:Add more info related to server */
@@ -163,21 +163,23 @@ func (elog NZLogger) Infoln(args ...interface{}) {
 	Info.Println(args...)
 }
 
-/* Fatal logs error and panic, forcing application to exit with message on stdout */
-func (elog NZLogger) Fatalf(fname string, s string, args ...interface{}) {
+/* Fatal logs error and returns error*/
+func (elog NZLogger) Fatalf(fname string, s string, args ...interface{}) error {
 	prefixStr := prefixString() + "[FATAL] " + fname + " "
 	Fatal.SetFlags(0)
 	Fatal.SetPrefix(prefixStr)
 
-	Fatal.Panic(fmt.Sprintf(s, args...))
+	Fatal.Printf(s, args...)
+	return fmt.Errorf(s, args...)
 }
 
-func (elog NZLogger) Fatalln(args ...interface{}) {
-	prefixStr := prefixString() + "[FATAL] "
+func (elog NZLogger) Fatalln(fname string, args ...interface{}) error {
+	prefixStr := prefixString() + "[FATAL] " + fname + " "
 	Fatal.SetFlags(0)
 	Fatal.SetPrefix(prefixStr)
 
-	Fatal.Panic(args...)
+	Fatal.Println(args...)
+	return fmt.Errorf("", args...)
 }
 
 /* Function name is determined from caller stack at runtime

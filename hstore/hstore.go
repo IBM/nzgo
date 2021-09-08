@@ -13,22 +13,22 @@ type Hstore struct {
 
 // escapes and quotes hstore keys/values
 // s should be a sql.NullString or string
-func hQuote(s interface{}) string {
+func hQuote(s interface{}) (string, error) {
 	var str string
 	switch v := s.(type) {
 	case sql.NullString:
 		if !v.Valid {
-			return "NULL"
+			return "NULL", nil
 		}
 		str = v.String
 	case string:
 		str = v
 	default:
-		panic("not a string or sql.NullString")
+		return "", elog.Fatalf(chopPath(funName()), "not a string or sql.NullString")
 	}
 
 	str = strings.Replace(str, "\\", "\\\\", -1)
-	return `"` + strings.Replace(str, "\"", "\\\"", -1) + `"`
+	return `"` + strings.Replace(str, "\"", "\\\"", -1) + `"`, nil
 }
 
 // Scan implements the Scanner interface.
@@ -111,7 +111,15 @@ func (h Hstore) Value() (driver.Value, error) {
 	}
 	parts := []string{}
 	for key, val := range h.Map {
-		thispart := hQuote(key) + "=>" + hQuote(val)
+		keyRes, err := hQuote(key)
+		if err != nil {
+			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		}
+		valRes, err := hQuote(val)
+		if err != nil {
+			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		}
+		thispart := keyRes + "=>" + valRes
 		parts = append(parts, thispart)
 	}
 	return []byte(strings.Join(parts, ",")), nil
