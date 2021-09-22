@@ -268,7 +268,8 @@ func (ci *copyin) Close() (err error) {
 	// Avoid touching the scratch buffer as resploop could be using it.
 	err = ci.cn.sendSimpleMessage('c')
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	<-ci.done
@@ -276,7 +277,8 @@ func (ci *copyin) Close() (err error) {
 
 	if ci.isErrorSet() {
 		err = ci.err
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
