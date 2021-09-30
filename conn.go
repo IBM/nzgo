@@ -412,7 +412,8 @@ func (cn *conn) handleDriverSettings(o values) (err error) {
 
 	err = boolSetting("disable_prepared_binary_result", &cn.disablePreparedBinaryResult)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return boolSetting("binary_parameters", &cn.binaryParameters)
 }
@@ -536,7 +537,8 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 
 	err = cn.handleDriverSettings(o)
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	cn.handlePgpass(o)
 
@@ -545,7 +547,8 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 		if cn.c != nil {
 			cn.c.Close()
 		}
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	// cn.startup panics on error. Make sure we don't leak cn.c.
 	panicking := true
@@ -558,14 +561,15 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 	cn.buf = bufio.NewReader(cn.c)
 	err = cn.startup(o)
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 
 	// reset the deadline, in case one was set (see dial)
 	if timeout, ok := o["connect_timeout"]; ok && timeout != "0" {
 		err = cn.c.SetDeadline(time.Time{})
 		if err != nil {
-			return cn, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return cn, err
 		}
 	}
 	panicking = false
@@ -605,11 +609,13 @@ func dial(ctx context.Context, d Dialer, o values) (net.Conn, error) {
 			conn, err = d.DialTimeout(network, address, duration)
 		}
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = conn.SetDeadline(deadline)
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		return conn, nil
 	}
@@ -773,7 +779,8 @@ func (cn *conn) begin(mode string) (_ driver.Tx, err error) {
 	err = cn.checkIsInTransaction(false)
 	_, commandTag, err := cn.simpleExec("BEGIN")
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	cn.txnStatus = txnStatusIdleInTransaction
 
@@ -810,7 +817,8 @@ func (cn *conn) Commit() (err error) {
 	// transaction, so it's also the least surprising thing to do here.
 	if cn.txnStatus == txnStatusInFailedTransaction {
 		if err := cn.Rollback(); err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return ErrInFailedTransaction
 	}
@@ -820,7 +828,8 @@ func (cn *conn) Commit() (err error) {
 		if cn.isInTransaction() {
 			cn.bad = true
 		}
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	cn.txnStatus = txnStatusIdle
 	if commandTag != "COMMIT" {
@@ -829,7 +838,8 @@ func (cn *conn) Commit() (err error) {
 	}
 	err = cn.checkIsInTransaction(false)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -847,7 +857,8 @@ func (cn *conn) Rollback() (err error) {
 		if cn.isInTransaction() {
 			cn.bad = true
 		}
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	cn.txnStatus = txnStatusIdle
 	if commandTag != "ROLLBACK" {
@@ -855,7 +866,8 @@ func (cn *conn) Rollback() (err error) {
 	}
 	err = cn.checkIsInTransaction(false)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -900,7 +912,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 
 	_, err = cn.c.Write(buffer.buf)
 	if err != nil {
-		return emptyRows, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return emptyRows, commandTag, err
 	}
 
 	cn.status = CONN_EXECUTING
@@ -909,7 +922,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 		var response byte
 		response, err = cn.recvSingleByte()
 		if err != nil {
-			return emptyRows, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return emptyRows, commandTag, err
 		}
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", response)
 		cn.recv_n_bytes(4)
@@ -921,7 +935,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			res, commandTag, err = cn.parseComplete(responseBuf.string())
 		case 'Z': /* Backend is ready for new query (6.4) */
 			if err != nil {
-				return res, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, commandTag, err
 			}
 			return res, commandTag, nil
 		case 'E':
@@ -930,13 +945,15 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			errorString := responseBuf.string()
 			err = errors.New(errorString)
 			if err != nil {
-				return res, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, commandTag, err
 			}
 			return res, commandTag, nil
 		case 'I':
 			res = emptyRows
 			if err != nil {
-				return res, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, commandTag, err
 			}
 			return res, commandTag, nil
 		case 'N':
@@ -946,7 +963,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 		case 'l':
 			err := cn.xferTable()
 			if err != nil {
-				return nil, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return nil, commandTag, err
 			}
 			break
 		case 'x': /* handle Ext Tbl parser abort */
@@ -954,7 +972,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			errorString := fmt.Sprintf("Error operation cancel")
 			err = errors.New(errorString)
 			if err != nil {
-				return res, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, commandTag, err
 			}
 			return res, commandTag, nil
 			break
@@ -985,7 +1004,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			fh, err = os.OpenFile(fname.string(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 			if err != nil { // file open failed
 				// Report error to the client
-				return emptyRows, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return emptyRows, commandTag, err
 			} else {
 				// file open successfully, send status back to datawriter
 				elog.Debugln(chopPath(funName()), "Successfully opened file: ", fh.Name())
@@ -999,7 +1019,8 @@ func (cn *conn) simpleExec(query string) (res driver.Result, commandTag string, 
 			errorString := fmt.Sprintf("Unknown response for simple exec: %q", response)
 			err = errors.New(errorString)
 			if err != nil {
-				return emptyRows, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return emptyRows, commandTag, err
 			}
 			return emptyRows, commandTag, nil
 		}
@@ -1021,7 +1042,8 @@ func (cn *conn) receiveAndWriteDatatoExternal(filename string, file *os.File) er
 				return elog.Fatalf(chopPath(funName()), "Unable to close the file: %q", err)
 			}
 			cn.Sock_clear_socket()
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		switch status.int32() {
 
@@ -1193,7 +1215,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 	for {
 		response, err := cn.recvSingleByte()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", response)
 		cn.recv_n_bytes(4)
@@ -1213,7 +1236,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			break
 		case 'Z':
 			if err != nil {
-				return res, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, err
 			}
 			return res, nil
 		case 'N':
@@ -1238,7 +1262,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			res = &rows{cn: cn}
 			res.rowsHeader = parsePortalRowDescribe(&responseBuf)
 			if err != nil {
-				return res, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, err
 			}
 			return res, nil
 		case 'I':
@@ -1249,7 +1274,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			}
 			res.done = true
 			if err != nil {
-				return res, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, err
 			}
 			return res, nil
 		case 'E':
@@ -1258,13 +1284,15 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			errorString := responseBuf.string()
 			err = errors.New(errorString)
 			if err != nil {
-				return res, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, err
 			}
 			return res, nil
 		case 'l':
 			err := cn.xferTable()
 			if err != nil {
-				return nil, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return nil, err
 			}
 			break
 		case 'x': /* handle Ext Tbl parser abort */
@@ -1272,7 +1300,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			errorString := fmt.Sprintf("Error operation cancel")
 			err = errors.New(errorString)
 			if err != nil {
-				return res, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, err
 			}
 			return res, nil
 			break
@@ -1295,7 +1324,8 @@ func (cn *conn) connNextResultSet(query string) (res *rows, err error) {
 			errorString := fmt.Sprintf("Unexpected response: %q", response)
 			err = errors.New(errorString)
 			if err != nil {
-				return nil, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return nil, err
 			}
 			return nil, nil
 			break
@@ -1340,7 +1370,8 @@ func (cn *conn) simpleQuery(query string) (res *rows, err error) {
 
 	_, err = cn.c.Write(buffer.buf)
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 
 	cn.status = CONN_EXECUTING
@@ -1440,13 +1471,15 @@ func (cn *conn) prepareTo(query, stmtName string) (*stmt, error) {
 	buffer.string(query + " ANALYZE ")
 	_, err := cn.c.Write(buffer.buf)
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 
 	for {
 		response, err := cn.recvSingleByte()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", response)
 		cn.recv_n_bytes(4)
@@ -1486,7 +1519,8 @@ func (cn *conn) Prepare(q string) (_ driver.Stmt, err error) {
 			cn.inCopy = true
 		}
 		if err != nil {
-			return s, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return s, err
 		}
 		return s, nil
 	}
@@ -1532,30 +1566,36 @@ func (cn *conn) query(query string, args []driver.Value) (_ *rows, err error) {
 	if cn.binaryParameters {
 		err = cn.sendBinaryModeQuery(query, args)
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = cn.readParseResponse()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = cn.readBindResponse()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		rows := &rows{cn: cn}
 		rows.rowsHeader, err = cn.readPortalDescribeResponse()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = cn.postExecuteWorkaround()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		return rows, nil
 	}
 	st, err := cn.prepareTo(query, "")
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	st.Query(args)
 	return &rows{
@@ -1576,7 +1616,8 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 		// ignore commandTag, our caller doesn't care
 		r, _, err := cn.simpleExec(query)
 		if err != nil {
-			return r, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return r, err
 		}
 		return r, nil
 	}
@@ -1584,27 +1625,33 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 	if cn.binaryParameters {
 		err = cn.sendBinaryModeQuery(query, args)
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = cn.readParseResponse()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = cn.readBindResponse()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		_, err = cn.readPortalDescribeResponse()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		err = cn.postExecuteWorkaround()
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		res, _, err = cn.readExecuteResponse("Execute")
 		if err != nil {
-			return nil, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return nil, err
 		}
 		return res, nil
 	}
@@ -1613,11 +1660,13 @@ func (cn *conn) Exec(query string, args []driver.Value) (res driver.Result, err 
 	// used.
 	st, err := cn.prepareTo(query, "")
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	r, err := st.Exec(args)
 	if err != nil {
-		return nil, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return nil, err
 	}
 	return r, nil
 }
@@ -1628,7 +1677,8 @@ func (cn *conn) send(m *writeBuf) error {
 	_, err := cn.c.Write(m.wrap())
 	if err != nil {
 		elog.Infoln(chopPath(funName()), "Error : ", err)
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -1636,7 +1686,8 @@ func (cn *conn) send(m *writeBuf) error {
 func (cn *conn) sendStartupPacket(m *writeBuf) error {
 	_, err := cn.c.Write((m.wrap())[1:])
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -1647,7 +1698,8 @@ func (cn *conn) sendStartupPacket(m *writeBuf) error {
 func (cn *conn) sendSimpleMessage(typ byte) (err error) {
 	_, err = cn.c.Write([]byte{typ, '\x00', '\x00', '\x00', '\x04'})
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -1681,7 +1733,8 @@ func (cn *conn) recvMessage(r *readBuf) (byte, error) {
 	x := cn.scratch[:7]
 	_, err := io.ReadFull(cn.buf, x)
 	if err != nil {
-		return 0, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return 0, err
 	}
 
 	// read the type and length of the message that follows
@@ -1695,7 +1748,8 @@ func (cn *conn) recvMessage(r *readBuf) (byte, error) {
 	}
 	_, err = io.ReadFull(cn.buf, y)
 	if err != nil {
-		return 0, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return 0, err
 	}
 	*r = y
 	return t, nil
@@ -1711,7 +1765,8 @@ func (cn *conn) recv() (t byte, r *readBuf, err error) {
 		r = &readBuf{}
 		t, err = cn.recvMessage(r)
 		if err != nil {
-			return t, r, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return t, r, err
 		}
 
 		switch t {
@@ -1757,7 +1812,8 @@ func (cn *conn) recv1() (t byte, r *readBuf) {
 func (cn *conn) ssl(o values) error {
 	upgrade, err := ssl(o)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	if upgrade == nil {
@@ -1768,13 +1824,15 @@ func (cn *conn) ssl(o values) error {
 	w := cn.writeBuf(0)
 	w.int32(80877103)
 	if err = cn.sendStartupPacket(w); err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	b := cn.scratch[:1]
 	_, err = io.ReadFull(cn.c, b)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	if b[0] != 'S' {
@@ -1783,7 +1841,8 @@ func (cn *conn) ssl(o values) error {
 
 	cn.c, err = upgrade(cn.c)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -1858,7 +1917,8 @@ func (cn *conn) startup(o values) (err error) {
 	elog.Debugln(chopPath(funName()), "Sending version ", versionPacket.version)
 	err = cn.send(b)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	//Handskhake negotiation with server
 	for {
@@ -1898,7 +1958,8 @@ func (cn *conn) startup(o values) (err error) {
 			elog.Debugln(chopPath(funName()), "Sending version ", versionPacket.version)
 			err = cn.send(b)
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 
 		} else if beresp == 'E' {
@@ -1925,7 +1986,8 @@ func (cn *conn) startup(o values) (err error) {
 	success, err := cn.Conn_send_database(o)
 	if success != true {
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	}
@@ -1933,7 +1995,8 @@ func (cn *conn) startup(o values) (err error) {
 	success = cn.Conn_set_next_dataprotocol()
 	if success != true {
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	}
@@ -1941,7 +2004,8 @@ func (cn *conn) startup(o values) (err error) {
 	success, err = cn.Conn_secure_session()
 	if success != true {
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	}
@@ -1963,7 +2027,8 @@ func (cn *conn) startup(o values) (err error) {
 	}
 	if success != true {
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	}
@@ -1972,7 +2037,8 @@ func (cn *conn) startup(o values) (err error) {
 	success, err = cn.Conn_authenticate(o)
 	if success != true {
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	}
@@ -1983,7 +2049,8 @@ func (cn *conn) startup(o values) (err error) {
 	err = cn.Conn_send_query()
 	if success != true {
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	}
@@ -2057,7 +2124,8 @@ func (cn *conn) Conn_send_query() error {
 
 	rows.Close()
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 	return nil
 }
@@ -2074,7 +2142,8 @@ func (rs *rows) readTuplesForCatalogueQuery(dest []driver.Value) (b byte, err er
 			length = length - 4
 			dest[i], err = decode(&conn.parameterStatus, rs.rb.next(length), rs.colTyps[i].OID, rs.colFmts[i])
 			if err != nil {
-				return response, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return response, err
 			}
 			elog.Debugln(chopPath(funName()), rs.rowsHeader.colNames[i], ":", dest[i])
 		}
@@ -2099,7 +2168,8 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 
 	response, err := cn.recvSingleByte()
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	for {
@@ -2120,7 +2190,8 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 			err = cn.saveMessage(response, &responseBuf)
 			response, err = res.readTuplesForCatalogueQuery(dest)
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			// for processing result set which return multiple rows
 			for response == 68 {
@@ -2132,7 +2203,8 @@ func (res *rows) NextForCatalogueQuery(dest []driver.Value) (err error) {
 				err = cn.saveMessage(response, &responseBuf)
 				response, err = res.readTuplesForCatalogueQuery(dest)
 				if err != nil {
-					return elog.Fatalf(chopPath(funName()), err.Error())
+					elog.Fatalf(chopPath(funName()), err.Error())
+					return err
 				}
 			}
 			continue
@@ -2182,7 +2254,8 @@ func (rs *rows) readTuples(dest []driver.Value) (err error) {
 				length = length - 4
 				dest[i], err = decode(&conn.parameterStatus, rs.rb.next(length), rs.colTyps[i].OID, rs.colFmts[i])
 				if err != nil {
-					return elog.Fatalf(chopPath(funName()), err.Error())
+					elog.Fatalf(chopPath(funName()), err.Error())
+					return err
 				}
 			}
 			elog.Debugln(chopPath(funName()), rs.rowsHeader.colNames[i], ":", dest[i])
@@ -2210,7 +2283,8 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 
 	response, err := cn.recvSingleByte()
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	for {
@@ -2235,7 +2309,8 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			err = cn.saveMessage(response, &responseBuf)
 			err = res.readTuples(dest)
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			return
 		case 'E':
@@ -2246,12 +2321,14 @@ func (res *rows) Next(dest []driver.Value) (err error) {
 			err = errors.New(errorString)
 			elog.Infoln(funName(), errorString)
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			return nil
 		case 'Z': /* Backend is ready for new query (6.4) */
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			return nil
 
@@ -3144,7 +3221,8 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 		}
 	}
 	if err != nil {
-		return res, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return res, err
 	}
 	return res, nil
 }
@@ -3176,7 +3254,8 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		elog.Debugf(chopPath(funName()), "Password  %s\n", o["password"])
 		err = cn.send(w)
 		if err != nil {
-			return false, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return false, err
 		}
 
 		res, err = cn.Conn_processAuthResponse()
@@ -3202,7 +3281,8 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		w.string(sFinal)
 		err = cn.send(w) //send md5 encoded hash
 		if err != nil {
-			return false, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return false, err
 		}
 
 		res, err = cn.Conn_processAuthResponse() //process server response
@@ -3227,7 +3307,8 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		w.string(sFinal)
 		err = cn.send(w) //send md5 encoded hash
 		if err != nil {
-			return false, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return false, err
 		}
 		res, err = cn.Conn_processAuthResponse() //process server response
 
@@ -3236,7 +3317,8 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		res = false
 	}
 	if err != nil {
-		return res, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return res, err
 	}
 	return res, nil
 }
@@ -3254,7 +3336,8 @@ func (cn *conn) Conn_send_database(o values) (bool, error) {
 	b.string(message.payload)
 	err := cn.send(b)
 	if err != nil {
-		return false, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return false, err
 	}
 
 	beresp, _ := cn.recvSingleByte()
@@ -3316,7 +3399,8 @@ func (cn *conn) Conn_secure_session() (bool, error) {
 
 		err = cn.send(b)
 		if err != nil {
-			return false, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return false, err
 		}
 		if information == HSV2_SSL_CONNECT {
 			cn.c, err = upgrade(cn.c) //It updates connection with SSL
@@ -3479,7 +3563,8 @@ func (cn *conn) Conn_send_handshake_version2(o values) (status bool, err error) 
 
 		err = cn.send(b)
 		if err != nil {
-			return false, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return false, err
 		}
 		if information != 0 {
 			beresp, _ := cn.recvSingleByte()
@@ -3634,7 +3719,8 @@ func (cn *conn) Conn_send_handshake_version4(o values) (status bool, err error) 
 
 		err = cn.send(b)
 		if err != nil {
-			return false, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return false, err
 		}
 		if information != 0 {
 			beresp, _ := cn.recvSingleByte()
@@ -3662,12 +3748,14 @@ func (cn *conn) auth(r *readBuf, o values) (err error) {
 		w.string(o["password"])
 		err = cn.send(w)
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 
 		t, r, err := cn.recv()
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 
 		if t != 'R' {
@@ -3683,11 +3771,13 @@ func (cn *conn) auth(r *readBuf, o values) (err error) {
 		w.string("md5" + md5s(md5s(o["password"]+o["user"])+s))
 		err = cn.send(w)
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		t, r, err := cn.recv()
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 
 		if t != 'R' {
@@ -3746,7 +3836,8 @@ func (st *stmt) Query(v []driver.Value) (r driver.Rows, err error) {
 	defer st.cn.errRecover(&err)
 	r, err = st.execQuery(v)
 	if err != nil {
-		return r, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return r, err
 	}
 	return r, nil
 }
@@ -3759,7 +3850,8 @@ func (st *stmt) Exec(v []driver.Value) (res driver.Result, err error) {
 
 	res, _, err = st.exec(v)
 	if err != nil {
-		return res, elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return res, err
 	}
 	return res, nil
 }
@@ -3924,7 +4016,8 @@ func (rs *rows) Close() error {
 			}
 		default:
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			return nil
 		}
@@ -4046,7 +4139,8 @@ func (cn *conn) sendBinaryModeQuery(query string, args []driver.Value) error {
 	b.next('S')
 	err := cn.send(b)
 	if err != nil {
-		return elog.Fatalf(chopPath(funName()), err.Error())
+		elog.Fatalf(chopPath(funName()), err.Error())
+		return err
 	}
 
 	return nil
@@ -4107,7 +4201,8 @@ func (cn *conn) readParseResponse() error {
 		err := parseError(r)
 		cn.readReadyForQuery()
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	default:
@@ -4135,7 +4230,8 @@ func (cn *conn) readStatementDescribeResponse() (paramTyps []oid.Oid, colNames [
 			err := parseError(r)
 			cn.readReadyForQuery()
 			if err != nil {
-				return nil, nil, nil, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return nil, nil, nil, err
 			}
 			return nil, nil, nil, nil
 		default:
@@ -4156,7 +4252,8 @@ func (cn *conn) readPortalDescribeResponse() (rowsHeader, error) {
 		err := parseError(r)
 		cn.readReadyForQuery()
 		if err != nil {
-			return rowsHeader{}, elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return rowsHeader{}, err
 		}
 		return rowsHeader{}, nil
 	default:
@@ -4174,7 +4271,8 @@ func (cn *conn) readBindResponse() error {
 		err := parseError(r)
 		cn.readReadyForQuery()
 		if err != nil {
-			return elog.Fatalf(chopPath(funName()), err.Error())
+			elog.Fatalf(chopPath(funName()), err.Error())
+			return err
 		}
 		return nil
 	default:
@@ -4201,14 +4299,16 @@ func (cn *conn) postExecuteWorkaround() error {
 			err := parseError(r)
 			cn.readReadyForQuery()
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			return nil
 		case 'C', 'D', 'I':
 			// the query didn't fail, but we can't process this message
 			err := cn.saveMessage(t, r)
 			if err != nil {
-				return elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return err
 			}
 			return nil
 		default:
@@ -4235,7 +4335,8 @@ func (cn *conn) readExecuteResponse(protocolState string) (res driver.Result, co
 				err = errUnexpectedReady
 			}
 			if err != nil {
-				return res, commandTag, elog.Fatalf(chopPath(funName()), err.Error())
+				elog.Fatalf(chopPath(funName()), err.Error())
+				return res, commandTag, err
 			}
 			return res, commandTag, nil
 		case 'E':
