@@ -522,12 +522,6 @@ func DialOpen(d Dialer, dsn string) (_ driver.Conn, err error) {
 }
 
 func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
-	// Handle any panics during connection initialization.  Note that we
-	// specifically do *not* want to use errRecover(), as that would turn any
-	// connection errors into ErrBadConns, hiding the real error message from
-	// the user.
-	defer errRecoverNoErrBadConn(&err)
-
 	o := c.opts
 
 	cn = &conn{
@@ -550,13 +544,6 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 		elog.Fatalf(chopPath(funName()), err.Error())
 		return nil, err
 	}
-	// cn.startup panics on error. Make sure we don't leak cn.c.
-	panicking := true
-	defer func() {
-		if panicking {
-			cn.c.Close()
-		}
-	}()
 
 	cn.buf = bufio.NewReader(cn.c)
 	err = cn.startup(o)
@@ -572,7 +559,6 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 			return cn, err
 		}
 	}
-	panicking = false
 
 	return cn, nil
 }
@@ -3176,7 +3162,7 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 	for flg != true {
 		t, _ := cn.recvSingleByte()
 		elog.Debugf(chopPath(funName()), "Backend response  %c \n", t)
-		if t != 'R' && t != 'N' {
+		if t != 'R' && t != 'N' && t != 'E' {
 			cn.recv_n_bytes(8) // do not use this just ignore
 		}
 		switch t {
@@ -3200,7 +3186,10 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 			break
 
 		case 'E':
-			err = elog.Fatalf(chopPath(funName()), "Error occured, server response : %q", t)
+			responseBuf, _ := cn.recv_n_bytes(2000)
+			errorString := responseBuf.string()
+			err = errors.New(errorString)
+			elog.Fatalf(chopPath(funName()), errorString)
 			res = false
 			flg = true
 
