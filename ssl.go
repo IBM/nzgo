@@ -15,6 +15,8 @@ const (
 	TLS1_CK_RSA_WITH_AES_128_SHA256         = 0x03c
 	TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256 = 0xc023
 	TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256   = 0xc027
+        TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 = 0xc02c
+        TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 = 0xc02b
 )
 
 // ssl generates a function to upgrade a net.Conn based on the "sslmode" and
@@ -27,6 +29,8 @@ func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
 		TLS1_CK_RSA_WITH_AES_128_SHA256,
 		TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256,
 		TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256,
+                TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+                TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 	}
 	switch mode := o["sslmode"]; mode {
 	// "require" is the default.
