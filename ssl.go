@@ -11,10 +11,14 @@ import (
 )
 
 const (
-	TLS1_CK_RSA_WITH_AES_128_GCM_SHA256     = 0x09C
-	TLS1_CK_RSA_WITH_AES_128_SHA256         = 0x03c
-	TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256 = 0xc023
-	TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256   = 0xc027
+        TLS1_CK_ECDHE_RSA_WITH_AES_256_GCM_SHA384 = 0xc030
+        TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 = 0xc02c
+        TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 = 0xc02b
+        TLS1_CK_RSA_WITH_AES_128_GCM_SHA256 = 0x009c
+        TLS1_CK_RSA_WITH_AES_256_GCM_SHA384 = 0x009d
+        TLS1_CK_RSA_WITH_AES_128_SHA256 = 0x03c
+        TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256 = 0xc023
+        TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256   = 0xc027
 )
 
 // ssl generates a function to upgrade a net.Conn based on the "sslmode" and
@@ -22,12 +26,17 @@ const (
 func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
 	verifyCaOnly := false
 	tlsConf := tls.Config{}
+        tlsConf.MinVersion = tls.VersionTLS12
 	tlsConf.CipherSuites = []uint16{
-		TLS1_CK_RSA_WITH_AES_128_GCM_SHA256,
-		TLS1_CK_RSA_WITH_AES_128_SHA256,
-		TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256,
-		TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256,
-	}
+                TLS1_CK_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+                TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                TLS1_CK_RSA_WITH_AES_128_GCM_SHA256,
+                TLS1_CK_RSA_WITH_AES_256_GCM_SHA384,
+                TLS1_CK_RSA_WITH_AES_128_SHA256,
+                TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256,
+                TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256,
+        }
 	switch mode := o["sslmode"]; mode {
 	// "require" is the default.
 	case "", "require":
