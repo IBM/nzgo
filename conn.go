@@ -94,12 +94,12 @@ type timeStamp struct {
 }
 
 type Interval struct {
-	time  int /* all time units other than months and years */ // NZ - was double
-	month int /* months and years, after time for alignment */
+	time  int64 /* all time units other than months and years */ // NZ - was double
+	month int   /* months and years, after time for alignment */
 }
 
 type TimeTzADT struct {
-	time int // all time units other than months and years
+	time int64 // all time units other than months and years
 	zone int // numeric time zone, in seconds
 }
 
@@ -2383,18 +2383,18 @@ func CTable_i_fieldSize(tupdesc DbosTupleDesc, coldex int) int {
 	return (tupdesc.field_size[coldex])
 }
 
-func date2j(y int, m int, d int) int {
+func date2j(y int, m int, d int) int64 {
 
 	var m12 int
 	m12 = (m - 14) / 12
 
-	return ((1461*(y+4800+m12))/4 + (367*(m-2-12*(m12)))/12 - (3*((y+4900+m12)/100))/4 + d - 32075)
+	return int64((1461*(y+4800+m12))/4 + (367*(m-2-12*(m12)))/12 - (3*((y+4900+m12)/100))/4 + d - 32075)
 } /* date2j() */
 
-func j2date(jd int, year *int, month *int, day *int) {
+func j2date(jd int64, year *int, month *int, day *int) {
 
-	var j, y, m, d int
-	var i, l, n int
+	var j, y, m, d int64
+	var i, l, n int64
 
 	l = jd + 68569
 	n = (4 * l) / 146097
@@ -2407,13 +2407,13 @@ func j2date(jd int, year *int, month *int, day *int) {
 	m = (j + 2) - (12 * l)
 	y = 100*(n-49) + i + l
 
-	*year = y
-	*month = m
-	*day = d
+	*year = int(y)
+	*month = int(m)
+	*day = int(d)
 	return
 } /* j2date() */
 
-func time2struct(time int, ts *TIME_STRUCT) {
+func time2struct(time int64, ts *TIME_STRUCT) {
 
 	time /= 1000000 // NZ microsecs
 
@@ -2467,32 +2467,32 @@ func interval2tm(span *Interval, tm *timeStamp, fsec *float64, neg_yflag *bool, 
 	time := span.time
 
 	if time < 0 {
-		tmpVal = int(math.Ceil(float64(time / 86400000000)))
+		tmpVal = int(math.Ceil(float64(time / int64(86400000000))))
 	} else {
-		tmpVal = int(math.Floor(float64(time / 86400000000)))
+		tmpVal = int(math.Floor(float64(time / int64(86400000000))))
 	}
 	if tmpVal != 0 {
-		time -= tmpVal * 86400000000
+		time -= int64(tmpVal) * int64(86400000000)
 		tm.tm_mday = tmpVal
 	}
 
 	if time < 0 {
-		tmpVal = int(math.Ceil(float64(time / 3600000000)))
+		tmpVal = int(math.Ceil(float64(time / int64(3600000000))))
 	} else {
-		tmpVal = int(math.Floor(float64(time / 3600000000)))
+		tmpVal = int(math.Floor(float64(time / int64(3600000000))))
 	}
 	if tmpVal != 0 {
-		time -= tmpVal * 3600000000
+		time -= int64(tmpVal) * int64(3600000000)
 		tm.tm_hour = tmpVal
 	}
 
 	if time < 0 {
-		tmpVal = int(math.Ceil(float64(time / 60000000)))
+		tmpVal = int(math.Ceil(float64(time / int64(60000000))))
 	} else {
-		tmpVal = int(math.Floor(float64(time / 60000000)))
+		tmpVal = int(math.Floor(float64(time / int64(60000000))))
 	}
 	if tmpVal != 0 {
-		time -= tmpVal * 60000000
+		time -= int64(tmpVal) * int64(60000000)
 		tm.tm_min = tmpVal
 	}
 
@@ -2502,7 +2502,7 @@ func interval2tm(span *Interval, tm *timeStamp, fsec *float64, neg_yflag *bool, 
 		tmpVal = int(math.Floor(float64(time / 1000000)))
 	}
 	if tmpVal != 0 {
-		time -= tmpVal * 1000000
+		time -= int64(tmpVal) * 1000000
 		tm.tm_sec = tmpVal
 	}
 
@@ -2647,10 +2647,10 @@ func timetz_out_timetzadt(time_arg *TimeTzADT) string {
 	time := time_arg.time / 1000000 // NZ microsecs
 	fusec := (time_arg.time % 1000000)
 
-	tm.tm_hour = (time / 3600)
+	tm.tm_hour = int(time / 3600)
 	time = time % 3600
-	tm.tm_min = (time / 60)
-	tm.tm_sec = time % 60
+	tm.tm_min = int(time / 60)
+	tm.tm_sec = int(time % 60)
 
 	tz := time_arg.zone
 
@@ -2708,15 +2708,15 @@ func EncodeTimeOnly(tm *timeStamp, fusec float64, tzp int) (str string) {
 	return str
 } /* EncodeTimeOnly() */
 
-func timestamp2struct(dt int, ts *TIMESTAMP_STRUCT) {
+func timestamp2struct(dt int64, ts *TIMESTAMP_STRUCT) {
 
-	date := dt / 86400000000
+	date := dt / int64(86400000000)
 	date0 := date2j(2000, 1, 1)
 
-	time := dt % 86400000000
+	time := dt % int64(86400000000)
 
 	if time < 0 {
-		time += 86400000000 // NZ - was 86400 w/o exp
+		time = time + int64(86400000000) // NZ - was 86400 w/o exp
 		date -= 1
 	}
 
@@ -2728,9 +2728,9 @@ func timestamp2struct(dt int, ts *TIMESTAMP_STRUCT) {
 	/* add offset to go from J2000 back to standard Julian date */
 	date += date0
 
-	j2date(int(date), &ts.year, &ts.month, &ts.day)
+	j2date(date, &ts.year, &ts.month, &ts.day)
 
-	ts.fraction = (time % 1000000) // NZ microsecs
+	ts.fraction = int(time % 1000000) // NZ microsecs
 	/*
 	* Netezza stores the fraction field of TIMESTAMP_STRUCT to
 	* microsecond precision. The fraction field of a must be in
@@ -2740,10 +2740,10 @@ func timestamp2struct(dt int, ts *TIMESTAMP_STRUCT) {
 
 	time /= 1000000 // NZ microsecs
 
-	ts.hour = (time / 3600)
-	time -= (ts.hour * 3600)
-	ts.minute = (time / 60)
-	ts.second = time - (ts.minute * 60)
+	ts.hour = int(time / 3600)
+	time -= int64(ts.hour * 3600)
+	ts.minute = int(time / 60)
+	ts.second = int(time) - (ts.minute * 60)
 }
 
 func (res *rows) Res_get_dbos_column_descriptions(r *readBuf) {
@@ -2803,7 +2803,8 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 	// For alignment issues, the buffer is defined as Int8 array
 	// as this is used for Int8s (in date-time data-types)
 	conn := res.cn
-	var field_lf, cur_field, workspace int
+	var field_lf, cur_field int
+	var workspace int64
 	var bitmap []byte
 
 	numFields := res.dbosTupleDescriptor.numFields
@@ -3027,7 +3028,7 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 					day:   0,
 				}
 				byteBuf := fieldDataP[:fldlen]
-				workspace = int(*(*int32)(unsafe.Pointer(&byteBuf[0])))
+				workspace = int64(*(*int32)(unsafe.Pointer(&byteBuf[0])))
 				j2date((workspace + date2j(2000, 1, 1)), &date_value.year, &date_value.month, &date_value.day)
 				dest[field_lf] = fmt.Sprintf("%02d-%02d-%02d", date_value.year, date_value.month, date_value.day)
 				elog.Debugf(chopPath(funName()), "field=%d, datatype=DATE, value=%s, len=%d ", cur_field+1, dest[field_lf], fldlen)
@@ -3042,7 +3043,7 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 					minute: 0,
 					second: 0,
 				}
-				workspace = int(binary.LittleEndian.Uint64(fieldDataP[:fldlen]))
+				workspace = int64(binary.LittleEndian.Uint64(fieldDataP[:fldlen]))
 				time2struct(workspace, &time_value)
 				dest[field_lf] = fmt.Sprintf("%02d:%02d:%02d", int(time_value.hour), int(time_value.minute), int(time_value.second))
 				elog.Debugf(chopPath(funName()), "field=%d, datatype=TIME, value=%s, len=%d ", cur_field+1, dest[field_lf], fldlen)
@@ -3056,7 +3057,7 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 				time:  0,
 				month: 0,
 			}
-			interval.time = int(binary.LittleEndian.Uint64(fieldDataP[:fldlen-4]))
+			interval.time = int64(binary.LittleEndian.Uint64(fieldDataP[:fldlen-4]))
 			byteBuf := fieldDataP[fldlen-4 : fldlen]
 			interval.month = int(*(*int32)(unsafe.Pointer(&byteBuf[0])))
 			dest[field_lf] = IntervalToText(&interval)
@@ -3069,7 +3070,7 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 				zone: 0,
 			}
 
-			timetz_value.time = int(binary.LittleEndian.Uint64(fieldDataP[:fldlen-4]))
+			timetz_value.time = int64(binary.LittleEndian.Uint64(fieldDataP[:fldlen-4]))
 			byteBuf := fieldDataP[fldlen-4 : fldlen]
 			timetz_value.zone = int(*(*int32)(unsafe.Pointer(&byteBuf[0])))
 			/*** convert to TIME_STRUCT ***/
@@ -3089,9 +3090,9 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 					fraction: 0,
 				}
 				if fldlen == 8 {
-					workspace = int(binary.LittleEndian.Uint64(fieldDataP[:fldlen]))
+					workspace = int64(binary.LittleEndian.Uint64(fieldDataP[:fldlen]))
 				} else if fldlen == 4 {
-					workspace = int(binary.LittleEndian.Uint32(fieldDataP[:fldlen]))
+					workspace = int64(binary.LittleEndian.Uint32(fieldDataP[:fldlen]))
 				}
 
 				if fldlen == 8 {
