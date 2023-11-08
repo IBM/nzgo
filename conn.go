@@ -2023,7 +2023,6 @@ func (cn *conn) startup(o values) (err error) {
 	success, err = cn.Conn_authenticate(o)
 	if success != true {
 		if err != nil {
-			elog.Fatalf(chopPath(funName()), err.Error())
 			return err
 		}
 		return nil
@@ -3226,7 +3225,9 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 	elog.Debugf(chopPath(funName()), "Backend response  %c\n", t)
 
 	if t != 'R' {
-		return false, nil
+		errBuf, _ := cn.recv_n_bytes(500) // Read the error message from backend
+		errMsg := errBuf.string()
+		return false, errors.New(errMsg)
 	}
 
 	x, _ = cn.recv_n_bytes(4) //type of password
