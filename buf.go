@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/IBM/nzgo/oid"
+	"github.com/IBM/nzgo/v12/oid"
 )
 
 type readBuf []byte
