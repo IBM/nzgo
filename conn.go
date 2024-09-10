@@ -3294,8 +3294,9 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		elog.Debugf(chopPath(funName()), "Salt value  %s\n", saltStr)
 		w := cn.writeBuf('p')
 		var sFinal string
+		const MinJWTTokenLen = 128 //Minimum length of the JWT token
 
-		if isJWT(o["password"]) {
+		if len(o["password"]) > MinJWTTokenLen && isJWT(o["password"]) {
 			sFinal = o["password"]
 			elog.Debugln(chopPath(funName()), "Password is a JWT token")
 		} else {
