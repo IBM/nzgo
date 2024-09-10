@@ -3215,6 +3215,15 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 	}
 	return res, nil
 }
+
+func isJWT(token string) bool {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	return true
+}
+
 func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 
 	var x readBuf
@@ -3284,7 +3293,12 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		saltStr := string(salt)
 		elog.Debugf(chopPath(funName()), "Salt value  %s\n", saltStr)
 		w := cn.writeBuf('p')
+		var sFinal string
 
+		if isJWT(o["password"]) {
+			sFinal = o["password"]
+			elog.Debugln(chopPath(funName()), "Password is a JWT token")
+		} else {
 		digest := sha256.New()
 		digest.Write([]byte(saltStr))
 		digest.Write([]byte(o["password"]))
@@ -3292,8 +3306,9 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		elog.Debugln(chopPath(funName()), "sha256 sum ", sha256Sum)
 
 		sEnc := b64.StdEncoding.EncodeToString(sha256Sum) //Base 64 bit encoding (24 bytes)
-		sFinal := strings.TrimRight(sEnc, "=")            //remove trailing '=' characters
+		sFinal = strings.TrimRight(sEnc, "=")            //remove trailing '=' characters
 		elog.Debugln(chopPath(funName()), "Encoded(Base 64bit) ", sFinal)
+		}
 
 		w.string(sFinal)
 		err = cn.send(w) //send md5 encoded hash
