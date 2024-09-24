@@ -3226,7 +3226,7 @@ func isJWT(token string) bool {
 
 	//Decode the header
 	header, err := b64.RawURLEncoding.DecodeString(parts[0])
-	if err!= nil {
+	if err != nil {
 		return false
 	}
 
