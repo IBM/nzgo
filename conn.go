@@ -24,7 +24,7 @@ import (
 	"time"
 	"unicode"
 	"unsafe"
-	"encoding/json"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/IBM/nzgo/v12/oid"
 )
@@ -3218,26 +3218,11 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 }
 
 func isJWT(token string) bool {
-
-	//Check if the string is in JWT token pattern
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return false
-	}
-
-	//Decode the header
-	header, err := b64.RawURLEncoding.DecodeString(parts[0])
-	if err != nil {
-		return false
-	}
-
-	// Try to unmarshal header into JSON to check if it's valid
-	var headerJson map[string]interface{}
-	if err := json.Unmarshal(header, &headerJson); err != nil {
-		return false
-	}
-
-	return true
+    _, _, err := new(jwt.Parser).ParseUnverified(token, jwt.MapClaims{})
+    if err != nil {
+        return false
+    }
+    return true
 }
 
 func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
