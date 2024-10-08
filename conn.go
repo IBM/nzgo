@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"io"
 	"math"
 	"net"
@@ -100,7 +101,7 @@ type Interval struct {
 
 type TimeTzADT struct {
 	time int64 // all time units other than months and years
-	zone int // numeric time zone, in seconds
+	zone int   // numeric time zone, in seconds
 }
 
 type TIMESTAMP_STRUCT struct {
@@ -3215,6 +3216,15 @@ func (cn *conn) Conn_processAuthResponse() (status bool, err error) {
 	}
 	return res, nil
 }
+
+func isJWT(token string) bool {
+	_, _, err := new(jwt.Parser).ParseUnverified(token, jwt.MapClaims{})
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 
 	var x readBuf
@@ -3284,16 +3294,23 @@ func (cn *conn) Conn_authenticate(o values) (status bool, err error) {
 		saltStr := string(salt)
 		elog.Debugf(chopPath(funName()), "Salt value  %s\n", saltStr)
 		w := cn.writeBuf('p')
+		sFinal := ""
+		const MinJWTTokenLen = 128 //Minimum length of the JWT token
 
-		digest := sha256.New()
-		digest.Write([]byte(saltStr))
-		digest.Write([]byte(o["password"]))
-		sha256Sum := digest.Sum(nil)
-		elog.Debugln(chopPath(funName()), "sha256 sum ", sha256Sum)
+		if len(o["password"]) > MinJWTTokenLen && isJWT(o["password"]) {
+			sFinal = o["password"]
+			elog.Debugln(chopPath(funName()), "Password is a JWT token")
+		} else {
+			digest := sha256.New()
+			digest.Write([]byte(saltStr))
+			digest.Write([]byte(o["password"]))
+			sha256Sum := digest.Sum(nil)
+			elog.Debugln(chopPath(funName()), "sha256 sum ", sha256Sum)
 
-		sEnc := b64.StdEncoding.EncodeToString(sha256Sum) //Base 64 bit encoding (24 bytes)
-		sFinal := strings.TrimRight(sEnc, "=")            //remove trailing '=' characters
-		elog.Debugln(chopPath(funName()), "Encoded(Base 64bit) ", sFinal)
+			sEnc := b64.StdEncoding.EncodeToString(sha256Sum) //Base 64 bit encoding (24 bytes)
+			sFinal = strings.TrimRight(sEnc, "=")             //remove trailing '=' characters
+			elog.Debugln(chopPath(funName()), "Encoded(Base 64bit) ", sFinal)
+		}
 
 		w.string(sFinal)
 		err = cn.send(w) //send md5 encoded hash
