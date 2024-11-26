@@ -3921,7 +3921,7 @@ func (st *stmt) exec(arg []driver.Value) (res driver.Result, commandTag string, 
 			str := fmt.Sprintf("%f", arg[i])
 			query = strings.Replace(query, placeholder, str, 1)
 		case string:
-			str := fmt.Sprintf("'%s'", arg[i])
+			str := fmt.Sprintf("\"%s\"", arg[i])
 			query = strings.Replace(query, placeholder, str, 1)
 		default:
 			return nil, placeholder, elog.Fatalf(chopPath(funName()), "unknown type of parameter")
