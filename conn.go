@@ -566,10 +566,6 @@ func (c *Connector) open(ctx context.Context) (cn *conn, err error) {
 
 func dial(ctx context.Context, d Dialer, o values) (net.Conn, error) {
 	network, address := network(o)
-	// SSL is not necessary or supported over UNIX domain sockets
-	if network == "unix" {
-		o["sslmode"] = "disable"
-	}
 
 	elog.Debugln("Network ", network)
 	elog.Debugln("Address ", address)
@@ -3438,7 +3434,7 @@ func (cn *conn) Conn_secure_session() (bool, error) {
 					information = HSV2_SSL_CONNECT
 
 				} else {
-					elog.Debugf(chopPath(funName()), err.Error())
+					return false, elog.Fatalf(chopPath(funName()), err.Error())
 					/* We failed to initialize SSL_context*/
 				}
 			case 'N':
