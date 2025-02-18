@@ -66,10 +66,8 @@ func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
 		verifyCaOnly = true
 	case "verify-full":
 		tlsConf.ServerName = o["host"]
-	case "disable":
-		return nil, nil
 	default:
-		return nil, fmterrorf(`unsupported sslmode %q; only "require" (default), "verify-full", "verify-ca", and "disable" supported`, mode)
+		return nil, fmterrorf(`unsupported sslmode %q; only "require" (default), "verify-full", and "verify-ca" supported`, mode)
 	}
 
 	err := sslClientCertificates(&tlsConf, o)
