@@ -169,6 +169,7 @@ const (
 	NzTypeJson   // 30
 	NzTypeJsonb
 	NzTypeJsonpath
+	NzTypeVector
 	NzTypeLastEntry // KEEP THIS ENTRY LAST - used internally to size an array
 )
 
@@ -192,6 +193,7 @@ var dataType = map[int]string{
 	NzTypeJson:         "NzTypeJson",
 	NzTypeJsonb:        "NzTypeJsonb",
 	NzTypeJsonpath:     "NzTypeJsonpath",
+	NzTypeVector:       "NzTypeVector",
 }
 
 const (
@@ -2895,6 +2897,8 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 			fallthrough
 		case NzTypeJsonb:
 			fallthrough
+		case NzTypeVector:
+			fallthrough
 		case NzTypeJsonpath:
 			memsize *= 4
 			memsize = memsize + 1 // for NULL-termination
@@ -2972,6 +2976,8 @@ func (res *rows) Res_read_dbos_tuple(dest []driver.Value) {
 		case NzTypeJson:
 			fallthrough
 		case NzTypeJsonb:
+			fallthrough
+		case NzTypeVector:
 			fallthrough
 		case NzTypeJsonpath:
 			cursize := int(binary.LittleEndian.Uint16(fieldDataP)) - 2 //to ignore 2 bytes
