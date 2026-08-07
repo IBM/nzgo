@@ -39,7 +39,7 @@ func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
         }
 	switch mode := o["sslmode"]; mode {
 	// "require" is the default.
-	case "", "require":
+	case "require":
 		// We must skip TLS's own verification since it requires full
 		// verification since Go 1.3.
 		tlsConf.InsecureSkipVerify = true
@@ -64,7 +64,7 @@ func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
 		// verification since Go 1.3.
 		tlsConf.InsecureSkipVerify = true
 		verifyCaOnly = true
-	case "verify-full":
+	case "", "verify-full":
 		tlsConf.ServerName = o["host"]
 	default:
 		return nil, fmterrorf(`unsupported sslmode %q; only "require" (default), "verify-full", and "verify-ca" supported`, mode)
