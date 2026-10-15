@@ -11,7 +11,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"io"
 	"math"
 	"net"
@@ -25,6 +24,8 @@ import (
 	"time"
 	"unicode"
 	"unsafe"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/IBM/nzgo/v12/oid"
 )
@@ -267,7 +268,7 @@ const (
 	PG_PROTOCOL_5
 )
 
-//Client Type
+// Client Type
 const (
 	NPSCLIENT_TYPE_GOLANG = 12
 )
@@ -3364,7 +3365,8 @@ func (cn *conn) Conn_send_database(o values) (bool, error) {
 	return false, nil
 }
 
-/*Cases which will fail:
+/*
+Cases which will fail:
 Client-> Preferred secured; Server-> Only Unsecured
 Client-> Preferred Unsecured; Server-> Only Secured
 All other cases of client and server combination will be taken care of.
@@ -3402,9 +3404,15 @@ func (cn *conn) Conn_secure_session() (bool, error) {
 				opcode: information,
 			}
 		}
-		currSecLevel, _ := strconv.Atoi(message.payload)
+		var currSecLevel int64
+		if message.payload != "" {
+			currSecLevel, err = strconv.ParseInt(message.payload, 10, 32)
+			if err != nil {
+				return false, err
+			}
+		}
 		b.int16(message.opcode)
-		b.int32(currSecLevel)
+		b.int32(int(currSecLevel))
 		elog.Debugln(chopPath(funName()), "Connection security ", message.opcode, message.payload)
 
 		err = cn.send(b)
@@ -3522,8 +3530,11 @@ func (cn *conn) Conn_send_handshake_version2(o values) (status bool, err error) 
 				payload: strconv.Itoa(os.Getpid()),
 			}
 			b.int16(message.opcode)
-			typ, _ := strconv.Atoi(message.payload)
-			b.int32(typ)
+			typ, err := strconv.ParseInt(message.payload, 10, 32)
+			if err != nil {
+				return false, err
+			}
+			b.int32(int(typ))
 			elog.Debugln(chopPath(funName()), "Remote PID ", message.payload)
 			information = HSV2_CLIENT_TYPE
 			break
@@ -3536,8 +3547,11 @@ func (cn *conn) Conn_send_handshake_version2(o values) (status bool, err error) 
 			}
 
 			b.int16(message.opcode)
-			typ, _ := strconv.Atoi(message.payload)
-			b.int16(typ)
+			typ, err := strconv.ParseInt(message.payload, 10, 16)
+			if err != nil {
+				return false, err
+			}
+			b.int16(int(typ))
 			elog.Debugln(chopPath(funName()), "Golang client ", message.payload)
 			if cn.hsVersion == CP_VERSION_5 {
 				information = HSV2_64BIT_VARLENA_ENABLED
@@ -3678,8 +3692,11 @@ func (cn *conn) Conn_send_handshake_version4(o values) (status bool, err error) 
 				payload: strconv.Itoa(os.Getpid()),
 			}
 			b.int16(message.opcode)
-			typ, _ := strconv.Atoi(message.payload)
-			b.int32(typ)
+			typ, err := strconv.ParseInt(message.payload, 10, 32)
+			if err != nil {
+				return false, err
+			}
+			b.int32(int(typ))
 			elog.Debugln(chopPath(funName()), "Remote PID ", message.payload)
 			information = HSV2_CLIENT_TYPE
 			break
@@ -3692,8 +3709,11 @@ func (cn *conn) Conn_send_handshake_version4(o values) (status bool, err error) 
 			}
 
 			b.int16(message.opcode)
-			typ, _ := strconv.Atoi(message.payload)
-			b.int16(typ)
+			typ, err := strconv.ParseInt(message.payload, 10, 16)
+			if err != nil {
+				return false, err
+			}
+			b.int16(int(typ))
 			elog.Debugln(chopPath(funName()), "Golang client ", message.payload)
 			if cn.hsVersion == CP_VERSION_6 {
 				information = HSV2_64BIT_VARLENA_ENABLED
@@ -3708,8 +3728,11 @@ func (cn *conn) Conn_send_handshake_version4(o values) (status bool, err error) 
 				payload: strconv.Itoa(IPS_CLIENT),
 			}
 			b.int16(message.opcode)
-			typ, _ := strconv.Atoi(message.payload)
-			b.int16(typ)
+			typ, err := strconv.ParseInt(message.payload, 10, 16)
+			if err != nil {
+				return false, err
+			}
+			b.int16(int(typ))
 			elog.Debugln(chopPath(funName()), "IPS client ", message.payload)
 			information = HSV2_CLIENT_DONE
 			break

@@ -532,7 +532,7 @@ func parseBytea(s []byte) (result []byte, err error) {
 				if len(s) < 4 {
 					return nil, fmt.Errorf("invalid bytea sequence %v", s)
 				}
-				r, err := strconv.ParseInt(string(s[1:4]), 8, 9)
+				r, err := strconv.ParseInt(string(s[1:4]), 8, 8)
 				if err != nil {
 					return nil, fmt.Errorf("could not parse bytea value: %s", err.Error())
 				}
