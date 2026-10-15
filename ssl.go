@@ -37,7 +37,7 @@ func ssl(o values) (func(net.Conn) (net.Conn, error), error) {
                 TLS1_CK_ECDHE_ECDSA_WITH_AES_128_SHA256,
                 TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256,
         }
-	insecure := o["sslmode"] == "required" || o["sslmode"] == "verify-ca"
+	insecure := o["sslmode"] == "require" || o["sslmode"] == "verify-ca"
 	switch mode := o["sslmode"]; mode {
 	// "require" is the default.
 	case "require":
