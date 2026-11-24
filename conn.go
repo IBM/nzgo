@@ -3566,8 +3566,11 @@ func (cn *conn) Conn_send_handshake_version2(o values) (status bool, err error) 
 				payload: strconv.Itoa(IPS_CLIENT),
 			}
 			b.int16(message.opcode)
-			typ, _ := strconv.Atoi(message.payload)
-			b.int16(typ)
+			typ, err := strconv.ParseInt(message.payload, 10, 16)
+			if err != nil {
+				return false, err
+			}
+			b.int16(int(typ))
 			elog.Debugln(chopPath(funName()), "IPS client ", message.payload)
 			information = HSV2_CLIENT_DONE
 			break

@@ -3,6 +3,8 @@ package nzgo
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"math"
 
 	"github.com/IBM/nzgo/v12/oid"
 )
@@ -55,12 +57,18 @@ type writeBuf struct {
 }
 
 func (b *writeBuf) int32(n int) {
+	if n < math.MinInt32 || n > math.MaxInt32 {
+		panic(fmt.Sprintf("int32 out of range: %d", n))
+	}
 	x := make([]byte, 4)
-	binary.BigEndian.PutUint32(x, uint32(n))
+	binary.BigEndian.PutUint32(x, uint32(int32(n)))
 	b.buf = append(b.buf, x...)
 }
 
 func (b *writeBuf) int16(n int) {
+	if n < 0 || n > math.MaxUint16 {
+		panic(fmt.Sprintf("int16 out of range: %d", n))
+	}
 	x := make([]byte, 2)
 	binary.BigEndian.PutUint16(x, uint16(n))
 	b.buf = append(b.buf, x...)
