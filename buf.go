@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/IBM/nzgo/v12/oid"
+	"github.com/IBM/nzgo/oid"
 )
 
 type readBuf []byte
