@@ -1,16 +1,16 @@
 # nzgo - a pure Go language driver for IBM Performance Server for PostgreSQL
 This project provides a native Go language database driver for IBM Performance Server for PostgreSQL.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/IBM/nzgo/v12.svg)](https://pkg.go.dev/github.com/IBM/nzgo/v12)
+[![Go Reference](https://pkg.go.dev/badge/github.com/IBM/nzgo.svg)](https://pkg.go.dev/github.com/IBM/nzgo)
 
 ## Install
 
-`go get github.com/IBM/nzgo/v12`
+`go get github.com/IBM/nzgo`
 
 ## Docs
 
 For detailed documentation and basic usage examples, please see the package
-documentation at <https://godoc.org/github.com/IBM/nzgo/v12>.
+documentation at <https://godoc.org/github.com/IBM/nzgo>.
 
 ## Tests
 

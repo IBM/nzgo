@@ -1,10 +1,5 @@
-module github.com/IBM/nzgo/v12
+module github.com/IBM/nzgo
 
-go 1.15
+go 1.21
 
-// Do not use these versions
-retract (
-	v12.0.4
-	v12.0.2
-	v12.0.0
-)
+require github.com/golang-jwt/jwt/v5 v5.3.1
